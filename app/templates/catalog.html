@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% from "_card.html" import product_card %}
+{% block title %}Courses — SmartReco{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <h1>Learn what you're actually curious about</h1>
+  <p class="lede">Browse freely. SmartReco watches what genuinely holds your attention and
+     builds a recommendation around it — grounded in this catalogue, never invented.</p>
+</section>
+
+<div class="filters">
+  <a class="chip {% if not active_category %}chip-on{% endif %}"
+     href="/" data-track-filter="category" data-value="">All</a>
+  {% for c in categories %}
+    <a class="chip {% if active_category == c %}chip-on{% endif %}"
+       href="/?category={{ c }}" data-track-filter="category" data-value="{{ c }}">{{ c }}</a>
+  {% endfor %}
+  <span class="filter-sep"></span>
+  {% for lv in ['beginner', 'intermediate', 'advanced'] %}
+    <a class="chip {% if active_level == lv %}chip-on{% endif %}"
+       href="/?{% if active_category %}category={{ active_category }}&{% endif %}level={{ lv }}"
+       data-track-filter="level" data-value="{{ lv }}">{{ lv }}</a>
+  {% endfor %}
+</div>
+
+<div class="grid">
+  {% for p in products %}
+    {{ product_card(p, loop.index0, 'catalog') }}
+  {% else %}
+    <p class="empty">No courses yet. An admin can add some from the admin panel.</p>
+  {% endfor %}
+</div>
+{% endblock %}

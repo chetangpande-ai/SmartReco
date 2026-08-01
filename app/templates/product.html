@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% from "_card.html" import product_card %}
+{% block title %}{{ product.title }} — SmartReco{% endblock %}
+
+{# tracker.js reads these to emit product_view and to label the dwell event. #}
+{% block body_attrs %}data-product-slug="{{ product.slug }}"
+  data-product-category="{{ product.category }}"
+  data-product-level="{{ product.level }}"{% endblock %}
+
+{% block content %}
+<article class="detail">
+  <div class="detail-main">
+    <div class="card-top">
+      <span class="pill pill-{{ product.level }}">{{ product.level }}</span>
+      <span class="pill pill-cat">{{ product.category }}</span>
+    </div>
+    <h1>{{ product.title }}</h1>
+    <p class="lede">{{ product.description }}</p>
+
+    {% if product.tags %}
+    <div class="tags">
+      {% for t in product.tags %}<span class="tag">{{ t }}</span>{% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  <aside class="detail-side">
+    <div class="price-big">{{ product.price_cents|money }}</div>
+    <dl class="meta">
+      <dt>Instructor</dt><dd>{{ product.instructor or '—' }}</dd>
+      <dt>Length</dt><dd>{{ product.duration_minutes // 60 }}h {{ product.duration_minutes % 60 }}m</dd>
+      <dt>Rating</dt><dd>★ {{ '%.1f'|format(product.rating) }}</dd>
+      <dt>Enrolled</dt><dd>{{ '{:,}'.format(product.enrollments) }}</dd>
+    </dl>
+    <button class="btn btn-primary btn-block"
+            data-track-click="enroll" data-product-slug="{{ product.slug }}">Enrol now</button>
+    <button class="btn btn-ghost btn-block"
+            data-track-click="add_to_cart" data-product-slug="{{ product.slug }}">Save for later</button>
+  </aside>
+</article>
+
+{% if related %}
+<section>
+  <h2 class="section-title">More in {{ product.category }}</h2>
+  <div class="grid">
+    {% for p in related %}{{ product_card(p, loop.index0, 'related') }}{% endfor %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}

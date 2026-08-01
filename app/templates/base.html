@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}SmartReco{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/app.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎯</text></svg>">
+</head>
+<body {% block body_attrs %}{% endblock %}>
+
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <a class="brand" href="/">
+      <span class="brand-mark">◆</span> SmartReco
+    </a>
+
+    <form class="search" action="/search" method="get" role="search">
+      <input type="search" name="q" placeholder="Search courses…"
+             value="{{ query|default('') }}" data-track-search autocomplete="off"
+             aria-label="Search courses">
+    </form>
+
+    <nav class="nav">
+      {% if user %}
+        <a href="/me" class="nav-link">My picks</a>
+        {% if user.is_admin %}<a href="/admin" class="nav-link">Admin</a>{% endif %}
+        <span class="nav-user" title="{{ user.email }}">{{ user.name }}</span>
+        <form action="/logout" method="post" class="inline">
+          <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+          <button class="btn btn-ghost" type="submit">Sign out</button>
+        </form>
+      {% else %}
+        <a href="/login" class="nav-link">Sign in</a>
+        <a href="/register" class="btn btn-primary">Get started</a>
+      {% endif %}
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  {% block content %}{% endblock %}
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    <span>SmartReco — behavioural recommendation agent</span>
+    <span class="muted">Activity on this site is tracked to personalise recommendations.</span>
+  </div>
+</footer>
+
+<script src="/static/js/tracker.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+# NeMo Guardrails — optional second layer over the deterministic rails in
+# app/services/guardrails.py. Enable with GUARDRAILS_LLM_ENABLED=true.
+#
+# The model is Mesh, like every other model call in this project: Mesh is an
+# OpenAI-compatible gateway, so the `openai` engine works unchanged once base_url and
+# the key are pointed at it (done in guardrails.NemoRails._load).
+
+models:
+  - type: main
+    engine: openai
+    model: openai/gpt-4o-mini
+    parameters:
+      temperature: 0.0
+
+rails:
+  output:
+    flows:
+      - self check output
+
+prompts:
+  - task: self_check_output
+    content: |
+      You are auditing marketing copy for an online course platform before it is shown
+      to a learner. The copy must be honest.
+
+      Block the message if it does any of the following:
+      - promises an outcome (a job, a salary, a result, a timeframe)
+      - claims a discount, sale, or saving
+      - invents urgency or scarcity (deadlines, limited seats, closing enrolment)
+      - states a price, rating, or course fact that was not supplied to it
+      - claims the learner did something, unless it was given as observed behaviour
+      - uses pressure tactics or shaming
+
+      Allow the message if it is specific, accurate, and simply explains why these
+      courses suit this learner.
+
+      Message to audit:
+      "{{ bot_response }}"
+
+      Answer with exactly one word, "yes" to block or "no" to allow.

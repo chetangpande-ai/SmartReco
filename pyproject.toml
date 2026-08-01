@@ -1,0 +1,85 @@
+[project]
+name = "smartreco"
+version = "1.0.0"
+description = "Behavioral AI recommendation agent — tracks user activity, retrieves from a vector catalog, and generates grounded, persuasive, guardrailed recommendations."
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+
+# Constraints are minimums; uv.lock pins the exact resolved versions and is
+# committed. Hard `==` pins across a stack this wide deadlock against each other
+# (deepagents -> langchain-google-genai -> google-genai needs anyio>=4.8, for one).
+dependencies = [
+    # Web
+    "fastapi>=0.141",
+    "uvicorn[standard]>=0.34",
+    "jinja2>=3.1.6",  # 3.1.6 is a security release
+    "python-multipart>=0.0.20",
+    "itsdangerous>=2.2",
+    # Data
+    "sqlalchemy>=2.0.51",
+    "alembic>=1.14",
+    "psycopg[binary]>=3.2.3",
+    "pydantic[email]>=2.13",  # [email] backs schemas.EmailStr
+    "pydantic-settings>=2.7",
+    # Auth
+    "bcrypt>=4.2",
+    "pyjwt>=2.10",
+    # LLM + agent. Every model call is routed at the Mesh gateway.
+    "openai>=2.52",
+    "langchain>=1.3",
+    "langchain-core>=1.5",
+    "langchain-openai>=1.4",
+    "langgraph>=1.2",
+    "langsmith>=0.10",
+    "deepagents>=0.7",
+    # Vector stores — two real backends, selected by VECTOR_BACKEND
+    "chromadb>=1.5",
+    "pinecone>=9.1",
+    "numpy>=2.2",
+    # Infra
+    "apscheduler>=3.11",
+    "httpx>=0.28",
+    "tenacity>=9.0",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+# NeMo Guardrails is a large install and its LLM-backed rails cost tokens. The
+# deterministic rails in app/services/guardrails.py always run without it.
+guardrails = ["nemoguardrails>=0.23"]
+# SES email delivery for the AWS deployment path.
+aws = ["boto3>=1.43"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-cov>=6.0",
+    "anyio>=4.8",
+    "ruff>=0.8",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = [".venv", "data", "alembic"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "C4", "SIM"]
+ignore = [
+    "E501",   # line length is the formatter's job
+    "B008",   # FastAPI Depends() in defaults is the documented idiom
+    "SIM108", # ternaries are not always more readable
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+filterwarnings = ["ignore::DeprecationWarning"]
+pythonpath = ["."]
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["app/seed.py", "*/templates/*"]

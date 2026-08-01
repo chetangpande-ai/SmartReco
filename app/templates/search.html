@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% from "_card.html" import product_card %}
+{% block title %}{{ query }} — SmartReco{% endblock %}
+
+{# Emitted as a committed `search` event by tracker.js — distinct from the partial
+   keystroke searches, which carry meta.partial = true. #}
+{% block body_attrs %}data-search-query="{{ query }}" data-search-results="{{ products|length }}"{% endblock %}
+
+{% block content %}
+<h1 class="section-title">
+  {% if query %}Results for “{{ query }}”{% else %}Search{% endif %}
+</h1>
+{% if query %}<p class="muted">{{ products|length }} course{{ '' if products|length == 1 else 's' }}</p>{% endif %}
+
+<div class="grid">
+  {% for p in products %}
+    {{ product_card(p, loop.index0, 'search') }}
+  {% else %}
+    <p class="empty">
+      {% if query %}Nothing matched. Try a broader term.{% else %}Type something to search.{% endif %}
+    </p>
+  {% endfor %}
+</div>
+{% endblock %}
