@@ -16,7 +16,7 @@
     </a>
 
     <form class="search" action="/search" method="get" role="search">
-      <input type="search" name="q" placeholder="Search courses…"
+      <input type="search" name="q" placeholder="Search products…"
              value="{{ query|default('') }}" data-track-search autocomplete="off"
              aria-label="Search courses">
     </form>
@@ -50,5 +50,6 @@
 </footer>
 
 <script src="/static/js/tracker.js" defer></script>
+{% block scripts %}{% endblock %}
 </body>
 </html>

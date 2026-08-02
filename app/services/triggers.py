@@ -158,8 +158,14 @@ def _budget_block(db: Session, user_id: int) -> str | None:
     return None
 
 
-def efficiency_stats() -> dict:
-    """Powers the "LLM calls avoided" panel on the admin dashboard."""
+def efficiency_stats(db: Session | None = None) -> dict:
+    """Powers the "LLM calls avoided" panel on the admin dashboard.
+
+    Skip decisions are counted in-process, so the ratio is explicitly scoped to "since
+    this process started" — mixing a volatile counter with an all-time database total
+    would produce a number like "0 runs out of 1 opportunity", which is worse than
+    useless because it looks authoritative. Durable totals are reported separately.
+    """
     snapshot = metrics.snapshot()
     skipped_by_reason = {
         key.split('reason="')[1].rstrip('"}'): int(value)
@@ -169,7 +175,8 @@ def efficiency_stats() -> dict:
     skipped = sum(skipped_by_reason.values())
     runs = int(sum(v for k, v in snapshot.items() if k.startswith("smartreco_agent_runs_total")))
     considered = skipped + runs
-    return {
+
+    stats = {
         "agent_runs": runs,
         "skipped": skipped,
         "considered": considered,
@@ -177,4 +184,15 @@ def efficiency_stats() -> dict:
         "by_reason": dict(sorted(skipped_by_reason.items(), key=lambda kv: -kv[1])),
         "budget_remaining_usd": round(mesh.budget_remaining_usd, 4),
         "spend_today_usd": round(settings.llm_daily_budget_usd - mesh.budget_remaining_usd, 4),
+        "runs_all_time": None,
+        "spend_all_time_usd": None,
     }
+
+    if db is not None:
+        stats["runs_all_time"] = int(
+            db.scalar(select(func.count()).select_from(AgentRun).where(AgentRun.status == "ok")) or 0
+        )
+        stats["spend_all_time_usd"] = round(
+            float(db.scalar(select(func.coalesce(func.sum(AgentRun.cost_usd), 0.0))) or 0.0), 6
+        )
+    return stats

@@ -49,11 +49,12 @@ def _vector_meta_core(p: Product) -> dict:
         "product_id": p.id,
         "slug": p.slug,
         "title": p.title,
+        "brand": p.brand,
         "category": p.category,
-        "level": p.level,
+        "tier": p.tier,
         "price_cents": p.price_cents,
         "rating": p.rating,
-        "duration_minutes": p.duration_minutes,
+        "spec": p.spec,
         "tags": ",".join(p.tags or []),
     }
 
@@ -143,7 +144,7 @@ def list_products(
     db: Session,
     *,
     category: str | None = None,
-    level: str | None = None,
+    tier: str | None = None,
     q: str | None = None,
     published_only: bool = True,
     limit: int = 60,
@@ -154,8 +155,8 @@ def list_products(
         stmt = stmt.where(Product.is_published.is_(True))
     if category:
         stmt = stmt.where(Product.category == category)
-    if level:
-        stmt = stmt.where(Product.level == level)
+    if tier:
+        stmt = stmt.where(Product.tier == tier)
     if q:
         like = f"%{q.lower()}%"
         stmt = stmt.where(
@@ -163,9 +164,10 @@ def list_products(
                 func.lower(Product.title).like(like),
                 func.lower(Product.description).like(like),
                 func.lower(Product.category).like(like),
+                func.lower(Product.brand).like(like),
             )
         )
-    stmt = stmt.order_by(Product.enrollments.desc(), Product.id).limit(limit).offset(offset)
+    stmt = stmt.order_by(Product.rating.desc(), Product.id).limit(limit).offset(offset)
     return list(db.scalars(stmt))
 
 

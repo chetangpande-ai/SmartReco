@@ -61,9 +61,11 @@ class Candidate:
     product_id: int
     title: str
     category: str
-    level: str
+    tier: str
     price_cents: int
     rating: float
+    brand: str = ""
+    spec: str = ""
     tags: list[str] = field(default_factory=list)
     description: str = ""
 
@@ -149,14 +151,17 @@ def get_lexical_index(db: Session) -> LexicalIndex:
     )
     if _index is None or key != _index_key:
         rows = db.execute(
-            select(Product.id, Product.title, Product.description, Product.category, Product.tags)
-            .where(Product.is_published.is_(True))
+            select(
+                Product.id, Product.title, Product.description, Product.category,
+                Product.tags, Product.brand, Product.spec,
+            ).where(Product.is_published.is_(True))
         ).all()
         docs = [
             # Title twice and tags twice: in a catalogue of short documents the title is
             # the strongest term signal and would otherwise be drowned by description.
-            (r.id, f"{r.title} {r.title} {r.category} {' '.join(r.tags or [])} "
-                   f"{' '.join(r.tags or [])} {r.description}")
+            # Brand is indexed separately so "sony headphones" is a lexical hit.
+            (r.id, f"{r.title} {r.title} {r.brand} {r.category} {' '.join(r.tags or [])} "
+                   f"{' '.join(r.tags or [])} {r.spec} {r.description}")
             for r in rows
         ]
         _index = LexicalIndex(docs)
@@ -217,7 +222,7 @@ def _passes(p: Product, flt: Filter | None, exclude: set[int]) -> bool:
         return True
     if flt.categories and p.category not in flt.categories:
         return False
-    if flt.levels and p.level not in flt.levels:
+    if flt.tiers and p.tier not in flt.tiers:
         return False
     if flt.max_price_cents is not None and p.price_cents > flt.max_price_cents:
         return False
@@ -311,9 +316,11 @@ def retrieve(
                 product_id=p.id,
                 title=p.title,
                 category=p.category,
-                level=p.level,
+                tier=p.tier,
                 price_cents=p.price_cents,
                 rating=p.rating,
+                brand=p.brand,
+                spec=p.spec,
                 tags=list(p.tags or []),
                 description=p.description,
                 vector_score=round(entry["v"], 4),
@@ -361,14 +368,14 @@ def popular(db: Session, top_n: int, exclude_ids: set[int] | None = None) -> lis
     rows = db.scalars(
         select(Product)
         .where(Product.is_published.is_(True))
-        .order_by(Product.rating.desc(), Product.enrollments.desc())
+        .order_by(Product.rating.desc(), Product.reviews.desc())
         .limit(top_n + len(exclude))
     )
     return [
         Candidate(
-            product_id=p.id, title=p.title, category=p.category, level=p.level,
-            price_cents=p.price_cents, rating=p.rating, tags=list(p.tags or []),
-            description=p.description, final_score=p.rating,
+            product_id=p.id, title=p.title, category=p.category, tier=p.tier,
+            price_cents=p.price_cents, rating=p.rating, brand=p.brand, spec=p.spec,
+            tags=list(p.tags or []), description=p.description, final_score=p.rating,
         )
         for p in rows
         if p.id not in exclude

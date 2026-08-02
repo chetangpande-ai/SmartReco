@@ -20,17 +20,17 @@ router = APIRouter(tags=["pages"])
 def home(
     request: Request,
     category: str | None = None,
-    level: str | None = None,
+    tier: str | None = None,
     db: Session = Depends(get_db),
 ):
-    products = catalog.list_products(db, category=category, level=level)
+    products = catalog.list_products(db, category=category, tier=tier)
     return render(
         request,
         "catalog.html",
         products=products,
         categories=catalog.categories(db),
         active_category=category,
-        active_level=level,
+        active_tier=tier,
     )
 
 
@@ -41,11 +41,11 @@ def search(request: Request, q: str = "", db: Session = Depends(get_db)):
     return render(request, "search.html", products=products, query=query)
 
 
-@router.get("/courses/{slug}")
+@router.get("/products/{slug}")
 def product_detail(request: Request, slug: str, db: Session = Depends(get_db)):
     product = db.scalar(select(Product).where(Product.slug == slug))
     if product is None or not product.is_published:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Course not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Product not found")
 
     related = [
         p

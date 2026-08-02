@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Agent runs — SmartReco admin{% endblock %}
+
+{% block content %}
+<div class="admin-head">
+  <h1>Agent runs</h1>
+  <nav class="admin-nav">
+    <a class="nav-link" href="/admin">Operations</a>
+    <a class="nav-link" href="/admin/products">Catalogue</a>
+  </nav>
+</div>
+
+<div class="stat-row">
+  <div class="stat"><span class="stat-value">{{ totals.runs }}</span><span class="stat-label">runs</span></div>
+  <div class="stat"><span class="stat-value">{{ totals.llm_calls }}</span><span class="stat-label">llm calls</span></div>
+  <div class="stat"><span class="stat-value">{{ '{:,}'.format(totals.tokens) }}</span><span class="stat-label">tokens</span></div>
+  <div class="stat"><span class="stat-value">${{ '%.4f'|format(totals.cost_usd) }}</span><span class="stat-label">spend</span></div>
+  <div class="stat"><span class="stat-value">{{ totals.avg_latency_ms }}</span><span class="stat-label">avg ms</span></div>
+  <div class="stat"><span class="stat-value {{ 'text-bad' if totals.errors else '' }}">{{ totals.errors }}</span><span class="stat-label">errors</span></div>
+</div>
+
+<p class="muted">
+  Grade is the LLM judge's score for retrieval quality. A run with refine loops &gt; 0 means the
+  first retrieval scored below {{ settings.retrieval_grade_threshold }} and the agent rewrote its
+  own query before generating.
+</p>
+
+{% include "admin/_runs_table.html" %}
+{% endblock %}

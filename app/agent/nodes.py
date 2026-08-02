@@ -16,15 +16,16 @@ import re
 
 from sqlalchemy import select
 
+from app.agent import prompts
+from app.agent.state import AgentState
 from app.config import settings
 from app.db import session_scope
 from app.models import Event, Product, UserProfile
-from app.services import guardrails, profile as profile_service
+from app.services import guardrails
+from app.services import profile as profile_service
 from app.services.mesh import MeshError, mesh
 from app.services.retrieval import popular, retrieve
 from app.services.vectorstore import Filter
-from app.agent import prompts
-from app.agent.state import AgentState
 
 log = logging.getLogger(__name__)
 
@@ -35,10 +36,12 @@ def _candidate_dict(c) -> dict:
     return {
         "product_id": c.product_id,
         "title": c.title,
+        "brand": c.brand,
         "category": c.category,
-        "level": c.level,
+        "tier": c.tier,
         "price_cents": c.price_cents,
         "rating": c.rating,
+        "spec": c.spec,
         "tags": c.tags,
         "description": c.description[:220],
         "retrieved_by": getattr(c, "retrieved_by", "popularity"),
@@ -71,38 +74,39 @@ def analyze(state: AgentState) -> dict:
         parts: list[str] = []
         parts.extend(prof.recent_queries[:3])
         parts.extend(list(prof.interests)[:3])
+        parts.extend(list(prof.brand_scores)[:2])
         parts.extend(list(prof.tag_scores)[:5])
         parts.extend(prof.top_terms[:5])
         query = " ".join(dict.fromkeys(p for p in parts if p))[:300]
 
-        # Don't re-recommend something they already committed to.
-        enrolled = {
+        # Don't re-recommend something they already bought or have in the basket.
+        committed = {
             pid
             for (pid,) in db.execute(
                 select(Event.product_id).where(
                     Event.user_id == state["user_id"],
-                    Event.type.in_(("enroll", "add_to_cart")),
+                    Event.type.in_(("purchase", "add_to_cart")),
                     Event.product_id.isnot(None),
                 )
             ).all()
         }
 
-        # Level filter as a real progression signal: someone consistently reading
-        # advanced material has moved past the beginner shelf.
-        levels = None
-        if prof.level_affinity == "advanced":
-            levels = ["intermediate", "advanced"]
-        elif prof.level_affinity == "beginner":
-            levels = ["beginner", "intermediate"]
+        # Tier filter as an upgrade signal: someone consistently looking at flagship
+        # models is not shopping the entry shelf, and vice versa.
+        tiers = None
+        if prof.tier_affinity == "flagship":
+            tiers = ["mid", "flagship"]
+        elif prof.tier_affinity == "entry":
+            tiers = ["entry", "mid"]
 
         # Generous price ceiling — a cap tight enough to bind would silently hide the
         # best match over a few dollars.
         max_price = int(prof.price_affinity_cents * 2.5) if prof.price_affinity_cents else None
 
         filters = {
-            "levels": levels,
+            "tiers": tiers,
             "max_price_cents": max_price,
-            "exclude_ids": sorted(enrolled),
+            "exclude_ids": sorted(committed),
         }
 
     log.debug("analyzed", extra={"query": query[:80], "facts": len(facts)})
@@ -131,7 +135,7 @@ def route_after_plan(state: AgentState) -> str:
 def retrieve_node(state: AgentState) -> dict:
     f = state.get("filters") or {}
     flt = Filter(
-        levels=f.get("levels"),
+        tiers=f.get("tiers"),
         max_price_cents=f.get("max_price_cents"),
     )
     exclude = set(f.get("exclude_ids") or [])
@@ -246,7 +250,7 @@ def refine(state: AgentState) -> dict:
     filter that excluded the right answer, not a query that failed to describe it.
     """
     filters = dict(state.get("filters") or {})
-    filters["levels"] = None
+    filters["tiers"] = None
     if filters.get("max_price_cents"):
         filters["max_price_cents"] = int(filters["max_price_cents"] * 2)
 
@@ -434,10 +438,10 @@ def finalize(state: AgentState) -> dict:
 # --------------------------------------------------------------------------- fallback
 def _plain_narrative(state: AgentState, picks: list[dict]) -> str:
     facts = state.get("evidence") or []
-    lead = f"Based on what you've been exploring — {facts[0]}" if facts else "Based on your recent activity"
+    lead = f"Based on what you've been looking at — {facts[0]}" if facts else "Based on your recent browsing"
     return (
-        f"{lead} — these {len(picks)} course"
-        f"{'s' if len(picks) != 1 else ''} line up with where you are now."
+        f"{lead} — {'these' if len(picks) != 1 else 'this'} {len(picks)} "
+        f"product{'s' if len(picks) != 1 else ''} line up with that."
     )
 
 
@@ -454,7 +458,11 @@ def _deterministic_copy(state: AgentState, candidates: list[dict]) -> dict:
     # profile.evidence() phrases every fact as a bare predicate ("searched for 'x'
     # 3 times", "spent 4m reading 'y'"), so "You " + fact is always a sentence.
     subject = next((m.group(1) for f in facts if (m := _QUOTED.search(f))), "")
-    headline = f"More on {subject}"[:70] if subject else "Picked for you"
+    category = next(iter(state.get("filters", {}).get("categories") or []), "")
+    headline = (
+        f"More like {subject}"[:70] if subject
+        else (f"Picked from {category}"[:70] if category else "Picked for you")
+    )
 
     if facts:
         lead = f"You {facts[0]}"
@@ -465,15 +473,16 @@ def _deterministic_copy(state: AgentState, candidates: list[dict]) -> dict:
 
     titles = ", ".join(c["title"] for c in top[:2])
     narrative = (
-        f"{lead}. These pick up that thread — starting with {titles}"
+        f"{lead}. These are the closest matches in stock — starting with {titles}"
         f"{', plus more below' if len(top) > 2 else ''}."
     )
 
     picks = [
         {
             "product_id": c["product_id"],
-            "reason": f"{c['level'].capitalize()} {c['category']} course "
-            f"rated {c['rating']:.1f}, matching your interest in {c['category']}.",
+            "reason": f"{c['brand']} {c['category'].replace('-', ' ')}, "
+            f"{c['tier']} tier, rated {c['rating']:.1f}"
+            + (f" — {c['spec'].split(' · ')[0]}." if c.get("spec") else "."),
         }
         for c in top
     ]

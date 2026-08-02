@@ -7,7 +7,7 @@
            └─1:N─ notifications
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import (
     JSON,
@@ -26,7 +26,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def ensure_utc(dt: datetime | None) -> datetime | None:
@@ -37,7 +37,7 @@ def ensure_utc(dt: datetime | None) -> datetime | None:
     one that passes CI on Postgres and dies in the demo."""
     if dt is None:
         return None
-    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
 class Base(DeclarativeBase):
@@ -80,14 +80,16 @@ class Product(Base):
     title: Mapped[str] = mapped_column(String(200))
     description: Mapped[str] = mapped_column(Text, default="")
     category: Mapped[str] = mapped_column(String(80), index=True)
-    level: Mapped[str] = mapped_column(String(24), default="beginner")
+    # entry | mid | flagship — the upgrade ladder the agent reasons about when it
+    # decides whether someone has outgrown the cheap end of a category.
+    tier: Mapped[str] = mapped_column(String(24), default="entry")
     tags: Mapped[list] = mapped_column(JSON, default=list)
     price_cents: Mapped[int] = mapped_column(Integer, default=0)
     currency: Mapped[str] = mapped_column(String(3), default="USD")
-    instructor: Mapped[str] = mapped_column(String(120), default="")
-    duration_minutes: Mapped[int] = mapped_column(Integer, default=0)
+    brand: Mapped[str] = mapped_column(String(120), default="")
+    spec: Mapped[str] = mapped_column(String(200), default="")
     rating: Mapped[float] = mapped_column(Float, default=0.0)
-    enrollments: Mapped[int] = mapped_column(Integer, default=0)
+    reviews: Mapped[int] = mapped_column(Integer, default=0)
     is_published: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
 
     # content_hash drives the dual-write: if it changed, the vector copy is stale.
@@ -108,11 +110,12 @@ class Product(Base):
         return self.vector_synced_at is not None
 
     def embedding_text(self) -> str:
-        """What gets embedded. Title is repeated because it carries the most signal."""
+        """What gets embedded. Title is repeated because it carries the most signal,
+        and brand is included so "sony headphones" matches without an exact title hit."""
         tags = " ".join(self.tags or [])
         return (
-            f"{self.title}. {self.title}. Category: {self.category}. "
-            f"Level: {self.level}. Topics: {tags}. {self.description}"
+            f"{self.title}. {self.title}. {self.brand}. Category: {self.category}. "
+            f"Tier: {self.tier}. Features: {tags}. {self.spec}. {self.description}"
         )
 
 
@@ -163,7 +166,8 @@ class UserProfile(Base):
     viewed_product_ids: Mapped[list] = mapped_column(JSON, default=list)
 
     price_affinity_cents: Mapped[int] = mapped_column(Integer, default=0)
-    level_affinity: Mapped[str] = mapped_column(String(24), default="")
+    tier_affinity: Mapped[str] = mapped_column(String(24), default="")
+    brand_scores: Mapped[dict] = mapped_column(JSON, default=dict)
 
     centroid: Mapped[bytes | None] = mapped_column(LargeBinary)  # float32 interest vector
     last_rec_centroid: Mapped[bytes | None] = mapped_column(LargeBinary)

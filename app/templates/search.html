@@ -10,7 +10,7 @@
 <h1 class="section-title">
   {% if query %}Results for “{{ query }}”{% else %}Search{% endif %}
 </h1>
-{% if query %}<p class="muted">{{ products|length }} course{{ '' if products|length == 1 else 's' }}</p>{% endif %}
+{% if query %}<p class="muted">{{ products|length }} product{{ '' if products|length == 1 else 's' }}</p>{% endif %}
 
 <div class="grid">
   {% for p in products %}

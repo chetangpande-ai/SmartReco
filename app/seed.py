@@ -1,8 +1,12 @@
-"""Deterministic demo catalogue: 32 courses, 8 categories, 3 users.
+"""Demo catalogue: 35 consumer electronics products across 8 categories, plus 3 users.
 
-Descriptions are written rather than generated because retrieval quality depends on
-them — a catalogue of "Course about X" embeds into mush and makes the agent look worse
-than it is.
+Real products, because a reviewer can judge instantly whether recommending the Bose
+QuietComfort Ultra to someone who lingered on the Sony WH-1000XM5 is sensible — that
+judgement is much harder to make about an unfamiliar catalogue.
+
+Descriptions are written rather than templated: retrieval quality depends on them, and
+a catalogue of "A good product" embeds into mush. Every fact here is also the *only*
+thing the agent is allowed to claim about a product, so the spec line matters.
 
     uv run python -m app.seed          # idempotent: safe to re-run
     uv run python -m app.seed --reset  # wipe first
@@ -23,115 +27,168 @@ from app.services.catalog import create_product
 
 log = logging.getLogger(__name__)
 
-# title, category, level, price$, hours, rating, tags, instructor, description
-COURSES = [
-    ("Building Agentic AI Systems with LangGraph", "ai", "advanced", 89, 9, 4.8,
-     ["agents", "langgraph", "orchestration", "llm"], "Dr. Maya Chen",
-     "Design multi-step AI agents that plan, call tools, and recover from failure. Covers graph state machines, conditional routing, checkpointing, and human-in-the-loop review for production agent deployments."),
-    ("Retrieval-Augmented Generation in Production", "ai", "advanced", 79, 8, 4.7,
-     ["rag", "vector-search", "embeddings", "llm"], "Dr. Maya Chen",
-     "Move beyond toy RAG demos. Chunking strategies, hybrid retrieval, re-ranking, groundedness evaluation, and the operational work of keeping a vector index consistent with a source of truth."),
-    ("Prompt Engineering for Engineers", "ai", "intermediate", 49, 5, 4.5,
-     ["prompting", "llm", "evaluation"], "Ravi Menon",
-     "A systematic approach to prompting: structured outputs, few-shot selection, decomposition, self-consistency, and building evaluation harnesses so you can tell whether a prompt change actually helped."),
-    ("Fine-Tuning Open Models on Your Own Data", "ai", "advanced", 99, 11, 4.6,
-     ["fine-tuning", "lora", "transformers"], "Dr. Elena Volkov",
-     "Adapt open-weight language models with LoRA and QLoRA. Dataset curation, hyperparameter selection, catastrophic forgetting, evaluation, and deciding when fine-tuning beats prompting or retrieval."),
-    ("LLM Evaluation and Guardrails", "ai", "advanced", 69, 6, 4.7,
-     ["evaluation", "guardrails", "safety", "llm"], "Ravi Menon",
-     "Measure what your model actually does. Offline eval sets, LLM-as-judge with its failure modes, groundedness and hallucination detection, plus deterministic and model-based guardrails for user-facing output."),
-    ("Introduction to Machine Learning", "ai", "beginner", 39, 12, 4.4,
-     ["ml", "scikit-learn", "regression"], "Sofia Almeida",
-     "Start from linear regression and finish able to train, validate, and interpret a real model. Bias-variance, cross-validation, feature engineering, and the honest limits of what a model can tell you."),
-    ("Deep Learning with PyTorch", "ai", "intermediate", 79, 14, 4.6,
-     ["pytorch", "neural-networks", "computer-vision"], "Dr. Elena Volkov",
-     "Build neural networks from tensors up. Autograd, training loops you write yourself, convolutional and attention architectures, and the debugging habits that separate working models from silent failures."),
-    ("MLOps: Shipping Models That Survive Contact With Users", "ai", "advanced", 89, 10, 4.5,
-     ["mlops", "deployment", "monitoring"], "Tom Bergström",
-     "Model registries, reproducible training, shadow deploys, drift detection, and rollback. The unglamorous engineering that decides whether a good model ever delivers value."),
+# title, brand, category, tier, price$, rating, tags, spec, description
+PRODUCTS = [
+    # ---- audio -------------------------------------------------------------
+    ("Sony WH-1000XM5 Wireless Headphones", "Sony", "audio", "flagship", 399, 4.8,
+     ["noise-cancelling", "over-ear", "wireless", "travel"],
+     "30h battery · adaptive ANC · multipoint Bluetooth 5.2 · 250g",
+     "Eight microphones and two processors cancel low-frequency cabin noise well enough that long flights stop being tiring. Light clamp force for all-day wear, and the folding case survives being crushed into a bag."),
+    ("Bose QuietComfort Ultra Headphones", "Bose", "audio", "flagship", 429, 4.7,
+     ["noise-cancelling", "over-ear", "wireless", "spatial-audio"],
+     "24h battery · immersive spatial audio · Bluetooth 5.3 · 250g",
+     "The strongest noise cancellation on the market paired with a head-tracked spatial mode that places the sound in front of you rather than inside your skull. Comfortable enough to forget you are wearing them."),
+    ("Apple AirPods Pro 2 (USB-C)", "Apple", "audio", "mid", 249, 4.7,
+     ["earbuds", "noise-cancelling", "wireless", "apple"],
+     "6h buds / 30h case · adaptive audio · USB-C · IP54",
+     "In-ear cancellation that adapts to your surroundings in real time, plus conversation awareness that ducks the music when you start speaking. Seamless if the rest of your devices are Apple."),
+    ("Sennheiser HD 660S2 Open-Back Headphones", "Sennheiser", "audio", "flagship", 599, 4.6,
+     ["open-back", "wired", "audiophile", "studio"],
+     "300 ohm · open-back · detachable cable · 6.3mm and 4.4mm",
+     "Open-back reference headphones for listening at a desk, not on a train. Deep, textured bass extension and an unhurried midrange, but they leak sound in both directions and want a proper amplifier."),
+    ("Anker Soundcore Q30 Headphones", "Anker", "audio", "entry", 79, 4.4,
+     ["noise-cancelling", "over-ear", "wireless", "budget"],
+     "40h battery with ANC · hybrid ANC · multipoint · 260g",
+     "The sensible budget pick. Noise cancellation good enough for an open-plan office and battery life that outlasts anything costing four times as much."),
+    ("Sonos Era 300 Smart Speaker", "Sonos", "audio", "flagship", 449, 4.5,
+     ["speaker", "spatial-audio", "wifi", "smart-home"],
+     "Six drivers · Dolby Atmos · Wi-Fi 6 · Trueplay tuning",
+     "A single speaker that genuinely produces height and width, angling drivers sideways and upward. Pairs into a surround set with a Sonos soundbar."),
 
-    ("SQL for Data Analysis", "data", "beginner", 29, 8, 4.5,
-     ["sql", "analytics", "postgres"], "Priya Raghavan",
-     "Query like an analyst. Joins, window functions, CTEs, and aggregation patterns, taught against a messy realistic dataset rather than a clean textbook one."),
-    ("Data Engineering with Python", "data", "intermediate", 69, 12, 4.4,
-     ["etl", "airflow", "pipelines"], "Tom Bergström",
-     "Build pipelines that do not wake you at 3am. Idempotent transforms, incremental loads, backfills, orchestration with Airflow, and designing for the day an upstream source changes shape."),
-    ("Analytics Engineering with dbt", "data", "intermediate", 59, 7, 4.6,
-     ["dbt", "modeling", "warehouse"], "Priya Raghavan",
-     "Turn raw warehouse tables into trustworthy models. Staging and mart layers, tests as contracts, incremental materialisation, and documentation that stays true because it is generated."),
-    ("Vector Databases and Semantic Search", "data", "intermediate", 59, 6, 4.7,
-     ["vector-search", "embeddings", "chroma", "pinecone"], "Dr. Maya Chen",
-     "How similarity search actually works. Embedding spaces, HNSW and IVF indexes, metadata filtering, hybrid lexical-plus-vector retrieval, and keeping an index synchronised with a relational source."),
-    ("Statistics for Decision Making", "data", "beginner", 39, 9, 4.3,
-     ["statistics", "ab-testing", "inference"], "Sofia Almeida",
-     "Hypothesis testing, confidence intervals, and experiment design, aimed at people who have to make a call on Friday with imperfect data rather than publish a paper."),
-    ("Data Visualisation That Persuades", "data", "beginner", 35, 5, 4.5,
-     ["visualization", "charts", "storytelling"], "Hannah Weiss",
-     "Choose the right chart, encode data honestly, and build a narrative that survives a sceptical room. Colour, annotation, and the specific ways charts mislead."),
+    # ---- phones ------------------------------------------------------------
+    ("Apple iPhone 15 Pro 256GB", "Apple", "phones", "flagship", 1099, 4.8,
+     ["smartphone", "titanium", "usb-c", "apple"],
+     "6.1in 120Hz OLED · A17 Pro · 48MP main · titanium · USB-C",
+     "Titanium frame drops meaningful weight from the previous generation, and the customisable Action button replaces the mute switch. The 48MP sensor finally shoots properly usable 24MP files by default."),
+    ("Samsung Galaxy S24 Ultra 512GB", "Samsung", "phones", "flagship", 1419, 4.7,
+     ["smartphone", "stylus", "telephoto", "android"],
+     "6.8in 120Hz · Snapdragon 8 Gen 3 · 200MP · S Pen · 5x optical",
+     "The most capable Android camera system available, with a 5x periscope that stays sharp in daylight and an S Pen tucked into the body. Big, heavy, and unapologetic about it."),
+    ("Google Pixel 8a 128GB", "Google", "phones", "mid", 499, 4.6,
+     ["smartphone", "camera", "android", "value"],
+     "6.1in 120Hz · Tensor G3 · 64MP main · 7 years of updates",
+     "Google's computational photography in a mid-range body, with seven years of OS and security updates — longer support than phones costing twice as much."),
+    ("Nothing Phone (2a) 256GB", "Nothing", "phones", "entry", 349, 4.3,
+     ["smartphone", "android", "budget", "design"],
+     "6.7in 120Hz AMOLED · Dimensity 7200 Pro · 50MP dual · 45W",
+     "Clean Android with a genuinely distinctive back panel. Fast where it matters — display, charging, day-to-day responsiveness — and honest about where it saves money."),
 
-    ("Python From Scratch", "programming", "beginner", 25, 15, 4.6,
-     ["python", "fundamentals"], "Sofia Almeida",
-     "A first programming course that does not hide the machine. Data structures, control flow, functions, files, and enough of the standard library to be independently useful."),
-    ("Modern Python: Typing, Async and Packaging", "programming", "intermediate", 55, 8, 4.7,
-     ["python", "async", "typing"], "Tom Bergström",
-     "The Python that shipping teams write. Static typing and its escape hatches, asyncio and structured concurrency, dependency and packaging workflows with modern tooling."),
-    ("FastAPI in Production", "programming", "intermediate", 59, 7, 4.8,
-     ["fastapi", "api", "backend", "python"], "Marcus Hale",
-     "Build an API you can operate. Dependency injection, background work, streaming, auth, observability, and load-shedding patterns for endpoints that must never block."),
-    ("Test-Driven Development in Practice", "programming", "intermediate", 45, 6, 4.4,
-     ["testing", "tdd", "pytest"], "Marcus Hale",
-     "Tests as a design tool. What to test and what not to, fixtures without magic, property-based testing, and keeping a suite fast enough that people actually run it."),
-    ("System Design Interview Preparation", "programming", "advanced", 75, 10, 4.6,
-     ["system-design", "architecture", "scalability"], "Kwame Osei",
-     "Reason about scale out loud. Partitioning, replication, caching layers, queues, consistency trade-offs, and how to structure an answer under time pressure."),
-    ("JavaScript for Backend Developers", "programming", "beginner", 35, 9, 4.2,
-     ["javascript", "node", "frontend"], "Hannah Weiss",
-     "The parts of JavaScript that surprise people arriving from another language: the event loop, closures, prototypes, modules, and the DOM APIs worth knowing."),
+    # ---- laptops -----------------------------------------------------------
+    ("Apple MacBook Air 15in M3 16GB/512GB", "Apple", "laptops", "flagship", 1499, 4.8,
+     ["laptop", "macos", "portable", "apple-silicon"],
+     "15.3in Liquid Retina · M3 · 18h battery · 1.51kg · fanless",
+     "A large screen in a fanless, silent chassis that still runs all day on battery. The machine to buy if you want a big display without carrying a heavy laptop."),
+    ("Dell XPS 14 (2024) Core Ultra 7", "Dell", "laptops", "flagship", 1699, 4.4,
+     ["laptop", "windows", "oled", "creator"],
+     "14.5in OLED 120Hz · Core Ultra 7 · RTX 4050 · 16GB · 1.7kg",
+     "An OLED panel with real contrast and a discrete GPU in a chassis thin enough to commute with. The invisible haptic trackpad and capacitive function row divide opinion sharply."),
+    ("Lenovo ThinkPad X1 Carbon Gen 12", "Lenovo", "laptops", "flagship", 1899, 4.6,
+     ["laptop", "windows", "business", "keyboard"],
+     "14in 2.8K OLED · Core Ultra 7 · 32GB · 1.09kg · MIL-STD",
+     "Still the best keyboard on any laptop, in a carbon-fibre chassis that weighs almost nothing and survives being treated badly. Serviceable, with excellent Linux support."),
+    ("ASUS Zenbook 14 OLED", "ASUS", "laptops", "mid", 899, 4.5,
+     ["laptop", "windows", "oled", "value"],
+     "14in 2.8K OLED 120Hz · Core Ultra 5 · 16GB · 1.2kg",
+     "An OLED display and a full metal body at a price where most competitors still ship dim LCDs and plastic. The obvious choice for writing and browsing rather than heavy compute."),
+    ("Framework Laptop 13 DIY Edition", "Framework", "laptops", "mid", 1049, 4.5,
+     ["laptop", "repairable", "modular", "linux"],
+     "13.5in 3:2 · Ryzen 7040 · swappable ports · user-serviceable",
+     "Every part is replaceable with a screwdriver and a QR code, including the ports. Buy it if you intend to keep and upgrade a laptop for a decade rather than replace it."),
 
-    ("AWS Solutions Architect Foundations", "cloud", "intermediate", 79, 16, 4.5,
-     ["aws", "cloud", "architecture"], "Kwame Osei",
-     "Design on AWS with intent. VPC layout, IAM that is neither wide open nor unusable, storage tiers, managed databases, and the cost consequences of each choice."),
-    ("Kubernetes for Application Developers", "cloud", "intermediate", 69, 11, 4.4,
-     ["kubernetes", "containers", "devops"], "Tom Bergström",
-     "Deploy and debug on Kubernetes without becoming a full-time operator. Pods, services, ingress, config and secrets, probes, resource limits, and reading a failing rollout."),
-    ("Docker and Container Fundamentals", "cloud", "beginner", 35, 6, 4.6,
-     ["docker", "containers", "devops"], "Marcus Hale",
-     "Images, layers, volumes and networks explained from first principles, plus multi-stage builds and the practices that keep production images small and non-root."),
-    ("Infrastructure as Code with Terraform", "cloud", "intermediate", 65, 8, 4.3,
-     ["terraform", "iac", "devops"], "Kwame Osei",
-     "Describe infrastructure so it can be reviewed, versioned and rebuilt. State management, modules, drift, and safe change workflows for shared environments."),
-    ("Observability: Logs, Metrics and Traces", "cloud", "advanced", 69, 7, 4.7,
-     ["observability", "prometheus", "tracing"], "Marcus Hale",
-     "Instrument a system so incidents are diagnosable. Structured logging, useful metric cardinality, distributed tracing, SLOs, and alerts that correlate with real user pain."),
+    # ---- cameras -----------------------------------------------------------
+    ("Sony Alpha A7 IV Mirrorless Body", "Sony", "cameras", "flagship", 2499, 4.8,
+     ["mirrorless", "full-frame", "hybrid", "video"],
+     "33MP full-frame · 4K60 · 10-bit 4:2:2 · IBIS · dual card",
+     "The default full-frame hybrid: reliable subject-tracking autofocus, genuinely usable 4K, and a sensor that holds detail well into high ISO. Heavy once a fast lens is attached."),
+    ("Fujifilm X-T5 Body", "Fujifilm", "cameras", "flagship", 1699, 4.7,
+     ["mirrorless", "aps-c", "retro", "photography"],
+     "40MP APS-C · 7-stop IBIS · dedicated dials · 557g",
+     "Physical dials for shutter speed and ISO mean you set exposure without entering a menu. Fuji's film simulations produce files you can use straight out of camera."),
+    ("Canon EOS R8 Body", "Canon", "cameras", "mid", 1499, 4.5,
+     ["mirrorless", "full-frame", "lightweight", "beginner"],
+     "24MP full-frame · 4K60 oversampled · Dual Pixel AF II · 461g",
+     "The lightest way into full-frame. Autofocus inherited from cameras costing three times as much, with compromises in battery life and a single card slot."),
+    ("Sony FE 24-70mm f/2.8 GM II Lens", "Sony", "cameras", "flagship", 2299, 4.9,
+     ["lens", "zoom", "full-frame", "professional"],
+     "24-70mm · f/2.8 constant · 695g · weather-sealed",
+     "The one lens that covers most professional work, rebuilt to be lighter and sharper than the original. Expensive, and the piece of glass most owners keep through several camera bodies."),
+    ("DJI Osmo Pocket 3 Creator Combo", "DJI", "cameras", "mid", 799, 4.6,
+     ["gimbal", "vlogging", "compact", "video"],
+     "1in sensor · 3-axis gimbal · 4K120 · rotating touchscreen",
+     "A stabilised 1-inch camera small enough to live in a pocket. Face tracking keeps you centred while walking, which is why it has largely replaced action cameras for talking-to-camera video."),
 
-    ("Web Application Security Essentials", "security", "intermediate", 59, 8, 4.6,
-     ["security", "owasp", "web"], "Dr. Amara Nwosu",
-     "The OWASP Top 10 as engineering practice: injection, broken auth, CSRF, SSRF, and access control, each with the defect, the exploit, and the fix in code."),
-    ("Applied Cryptography for Developers", "security", "advanced", 79, 9, 4.5,
-     ["cryptography", "tls", "security"], "Dr. Amara Nwosu",
-     "Use cryptography correctly without inventing it. Symmetric and public-key primitives, password hashing, TLS, key management, and the classic misuse patterns."),
-    ("Threat Modelling for Product Teams", "security", "intermediate", 49, 5, 4.4,
-     ["security", "threat-modeling", "architecture"], "Dr. Amara Nwosu",
-     "Find design flaws before they ship. Trust boundaries, STRIDE, abuse cases, and running a threat modelling session that produces decisions rather than a document."),
+    # ---- tv ----------------------------------------------------------------
+    ("LG C4 65in OLED evo TV", "LG", "tv", "flagship", 1799, 4.8,
+     ["oled", "4k", "gaming", "hdr"],
+     "65in OLED · 144Hz · 4x HDMI 2.1 · Dolby Vision · webOS",
+     "Perfect blacks and per-pixel contrast, with four full-bandwidth HDMI 2.1 ports so a console and a PC can both run at high refresh. The reference choice for a dark room."),
+    ("Samsung QN90D 55in Neo QLED TV", "Samsung", "tv", "flagship", 1299, 4.6,
+     ["qled", "4k", "bright-room", "gaming"],
+     "55in mini-LED · 144Hz · anti-glare · HDR10+ · Tizen",
+     "Mini-LED backlighting gets far brighter than OLED, which matters in a room with windows. The matte anti-reflection layer is the reason to pick this over a cheaper panel."),
+    ("Hisense U6N 55in Mini-LED TV", "Hisense", "tv", "entry", 549, 4.3,
+     ["mini-led", "4k", "budget", "hdr"],
+     "55in mini-LED · 60Hz · Dolby Vision · Google TV",
+     "Genuine mini-LED backlighting and Dolby Vision at a price that used to buy a basic edge-lit panel. 60Hz limits it for gaming, but for film and television it punches far above its cost."),
+    ("Sonos Arc Ultra Soundbar", "Sonos", "tv", "flagship", 999, 4.6,
+     ["soundbar", "dolby-atmos", "wifi", "home-cinema"],
+     "14 drivers · Dolby Atmos · eARC · Trueplay · Wi-Fi 6",
+     "Height channels that actually reach the ceiling and come back, plus speech enhancement that rescues muttered dialogue. Expands with a sub and rear speakers later."),
 
-    ("Product Design Fundamentals", "design", "beginner", 39, 7, 4.4,
-     ["ux", "design", "prototyping"], "Hannah Weiss",
-     "Research, information architecture, wireframing and usability testing — the loop that turns a vague product idea into something people can actually operate."),
-    ("Design Systems at Scale", "design", "intermediate", 59, 6, 4.5,
-     ["design-systems", "ui", "accessibility"], "Hannah Weiss",
-     "Build a component library teams adopt willingly. Tokens, composition, accessibility as a default, documentation, and versioning shared UI without breaking consumers."),
+    # ---- smart home --------------------------------------------------------
+    ("Philips Hue White & Colour Starter Kit", "Philips", "smart-home", "mid", 179, 4.6,
+     ["lighting", "zigbee", "smart-home", "matter"],
+     "3 bulbs + bridge · 16M colours · Matter · Zigbee",
+     "The lighting system everything else integrates with. The bridge keeps working when your internet does not, which is the difference between smart lighting and frustrating lighting."),
+    ("Aqara Smart Hub M3 with Sensors", "Aqara", "smart-home", "mid", 129, 4.4,
+     ["hub", "sensors", "matter", "automation"],
+     "Matter controller · Thread border router · IR blaster · local",
+     "Runs automations locally rather than in someone's cloud, bridges Zigbee and Thread devices into Matter, and replaces every infrared remote in the room."),
+    ("Ecobee Smart Thermostat Premium", "Ecobee", "smart-home", "flagship", 249, 4.5,
+     ["thermostat", "energy", "smart-home", "sensors"],
+     "Room sensors · air quality monitor · Matter · built-in speaker",
+     "Remote sensors mean the house heats to the temperature of the room you are in rather than the hallway. Pays for itself over a couple of winters in a badly balanced home."),
+    ("Ring Battery Doorbell Plus", "Ring", "smart-home", "entry", 149, 4.2,
+     ["doorbell", "camera", "security", "battery"],
+     "1536p head-to-toe view · battery · two-way talk · no wiring",
+     "Installs without touching mains wiring, and the taller sensor shows a whole person and any parcel on the doorstep rather than a cropped face."),
 
-    ("Product Management for Technical Teams", "business", "intermediate", 55, 8, 4.3,
-     ["product", "roadmap", "strategy"], "Julia Marsh",
-     "Prioritise credibly. Opportunity sizing, discovery, writing specs engineers respect, and communicating trade-offs to stakeholders who want everything at once."),
-    ("Growth Analytics and Experimentation", "marketing", "intermediate", 49, 6, 4.4,
-     ["growth", "ab-testing", "funnels"], "Julia Marsh",
-     "Instrument a funnel, run experiments that are not fooling you, and read retention curves honestly. Covers cohort analysis, guardrail metrics and common statistical traps."),
+    # ---- gaming ------------------------------------------------------------
+    ("Sony PlayStation 5 Slim Disc Edition", "Sony", "gaming", "flagship", 499, 4.7,
+     ["console", "4k", "gaming", "disc"],
+     "4K120 · ray tracing · 1TB SSD · DualSense haptics",
+     "The haptic triggers change how games feel in a way screenshots cannot convey. The disc drive is detachable, so a physical library stays usable."),
+    ("Valve Steam Deck OLED 1TB", "Valve", "gaming", "flagship", 649, 4.8,
+     ["handheld", "pc-gaming", "linux", "portable"],
+     "7.4in HDR OLED 90Hz · 1TB · 50Wh · SteamOS",
+     "A full PC that plays your existing Steam library on a train. The OLED revision fixed the battery life and screen complaints of the original."),
+    ("NVIDIA GeForce RTX 4070 Super 12GB", "NVIDIA", "gaming", "flagship", 599, 4.6,
+     ["gpu", "pc-gaming", "ray-tracing", "dlss"],
+     "12GB GDDR6X · DLSS 3 · 220W · 1440p high refresh",
+     "The sensible high-refresh 1440p card. DLSS frame generation makes ray tracing playable at settings the raw silicon could not otherwise sustain."),
+    ("Logitech G Pro X Superlight 2", "Logitech", "gaming", "mid", 159, 4.7,
+     ["mouse", "wireless", "esports", "lightweight"],
+     "60g · 32K DPI · 95h battery · USB-C · hybrid switches",
+     "Sixty grams and no perceptible wireless latency. The mouse most competitive players actually use, which is unusual for a product marketed at them."),
+
+    # ---- wearables ---------------------------------------------------------
+    ("Apple Watch Series 10 46mm GPS", "Apple", "wearables", "flagship", 429, 4.7,
+     ["smartwatch", "fitness", "health", "apple"],
+     "Wide-angle OLED · ECG · sleep apnoea alerts · 18h · IP6X",
+     "The thinnest Apple Watch with the largest display, adding sleep apnoea detection. Genuinely useful health monitoring, provided you carry an iPhone."),
+    ("Garmin Forerunner 265 Music", "Garmin", "wearables", "mid", 449, 4.7,
+     ["running", "gps", "amoled", "training"],
+     "AMOLED · 13 days smartwatch / 20h GPS · offline music · multi-band",
+     "Training load and recovery metrics that actually inform how you plan a week, with multi-band GPS that holds a track between tall buildings. Battery measured in weeks, not hours."),
+    ("Oura Ring Gen 4 Silver", "Oura", "wearables", "mid", 349, 4.3,
+     ["sleep", "recovery", "health", "ring"],
+     "Up to 8 days · sleep staging · temperature trends · titanium",
+     "Sleep and recovery tracking from something you forget you are wearing, which is the entire argument against a wrist device for sleep. Requires a subscription for the full analysis."),
 ]
 
 DEMO_USERS = [
     ("admin@smartreco.dev", "admin12345", "Admin", "admin"),
-    ("learner@smartreco.dev", "learner12345", "Alex Rivera", "user"),
+    ("shopper@smartreco.dev", "shopper12345", "Alex Rivera", "user"),
     ("demo@smartreco.dev", "demo12345", "Demo User", "user"),
 ]
 
@@ -155,9 +212,7 @@ def seed(reset: bool = False) -> dict:
         for email, password, name, role in DEMO_USERS:
             if db.scalar(select(User.id).where(User.email == email)):
                 continue
-            user = User(
-                email=email, password_hash=hash_password(password), name=name, role=role
-            )
+            user = User(email=email, password_hash=hash_password(password), name=name, role=role)
             db.add(user)
             db.flush()
             db.add(UserProfile(user_id=user.id))
@@ -165,27 +220,27 @@ def seed(reset: bool = False) -> dict:
 
     with session_scope() as db:
         existing = {t for (t,) in db.execute(select(Product.title)).all()}
-        for title, cat, level, price, hours, rating, tags, instructor, desc in COURSES:
+        for title, brand, category, tier, price, rating, tags, spec, description in PRODUCTS:
             if title in existing:
                 continue
             create_product(
                 db,
                 ProductIn(
                     title=title,
-                    description=desc,
-                    category=cat,
-                    level=level,
+                    description=description,
+                    category=category,
+                    tier=tier,
                     tags=tags,
                     price_cents=price * 100,
-                    instructor=instructor,
-                    duration_minutes=hours * 60,
+                    brand=brand,
+                    spec=spec,
                     rating=rating,
                     is_published=True,
                 ),
             )
             created_products += 1
 
-    # One drain embeds every new course in a single batched call rather than one per row.
+    # One drain embeds every new product in a single batched call rather than one per row.
     synced = outbox.drain_all()
     health = outbox.health()
 

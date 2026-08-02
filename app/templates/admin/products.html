@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Catalogue — SmartReco admin{% endblock %}
+
+{% block content %}
+<div class="admin-head">
+  <h1>Catalogue</h1>
+  <nav class="admin-nav">
+    <a class="nav-link" href="/admin">Operations</a>
+    <a class="nav-link" href="/admin/agent-runs">Agent runs</a>
+    <a class="btn btn-primary" href="/admin/products/new">Add course</a>
+  </nav>
+</div>
+
+<form class="admin-search" method="get" action="/admin/products">
+  <input type="search" name="q" value="{{ q }}" placeholder="Filter by title, description or category…">
+</form>
+
+<p class="muted">
+  The <strong>vector</strong> column reflects the dual-write: a product is only searchable by
+  the agent once its outbox row has been drained into the vector store.
+</p>
+
+<div class="table-scroll">
+<table class="data">
+  <thead>
+    <tr><th>Product</th><th>Category</th><th>Tier</th><th class="num">Price</th>
+        <th class="num">Rating</th><th>Published</th><th>Vector</th><th></th></tr>
+  </thead>
+  <tbody>
+  {% for p in products %}
+    <tr>
+      <td><a href="/products/{{ p.slug }}">{{ p.title }}</a>
+          <div class="mono small muted">{{ p.brand }} · {{ p.slug }}</div></td>
+      <td>{{ p.category.replace('-', ' ') }}</td>
+      <td><span class="pill pill-{{ p.tier }}">{{ p.tier }}</span></td>
+      <td class="num">{{ p.price_cents|money }}</td>
+      <td class="num">{{ '%.1f'|format(p.rating) }}</td>
+      <td>{% if p.is_published %}<span class="badge badge-good">live</span>
+          {% else %}<span class="badge">draft</span>{% endif %}</td>
+      <td>{% if not p.is_published %}<span class="muted small">n/a</span>
+          {% elif p.vector_in_sync %}<span class="badge badge-good">synced</span>
+          {% else %}<span class="badge badge-warn">pending</span>{% endif %}</td>
+      <td class="row-actions">
+        <a class="btn btn-ghost btn-sm" href="/admin/products/{{ p.id }}/edit">Edit</a>
+        <form method="post" action="/admin/products/{{ p.id }}/delete" class="inline"
+              onsubmit="return confirm('Delete “{{ p.title }}”? This also removes it from the vector store.');"
+              data-product-title="{{ p.title }}">
+          <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+          <button class="btn btn-ghost btn-sm btn-danger" type="submit">Delete</button>
+        </form>
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="8" class="muted">No courses match.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

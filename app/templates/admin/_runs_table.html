@@ -1,0 +1,35 @@
+<div class="table-scroll">
+<table class="data">
+  <thead>
+    <tr>
+      <th>When</th><th>User</th><th>Trigger</th><th>Path</th>
+      <th class="num">Grade</th><th class="num">Refines</th>
+      <th class="num">Calls</th><th class="num">Tokens</th><th class="num">Cost</th>
+      <th class="num">ms</th><th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for r in runs %}
+    <tr class="{{ 'row-bad' if r.status != 'ok' else '' }}">
+      <td class="small">{{ r.created_at.strftime('%d %b %H:%M:%S') }}</td>
+      <td class="small">{{ r.user_id }}</td>
+      <td><span class="pill pill-plain">{{ r.trigger }}</span></td>
+      <td class="mono small">{{ r.node_path|join('→') }}</td>
+      <td class="num">{{ '%.2f'|format(r.grade_score) }}</td>
+      <td class="num">{{ r.refine_loops }}</td>
+      <td class="num">{{ r.llm_calls }}</td>
+      <td class="num">{{ r.prompt_tokens + r.completion_tokens }}</td>
+      <td class="num">${{ '%.5f'|format(r.cost_usd) }}</td>
+      <td class="num">{{ r.latency_ms }}</td>
+      <td>
+        {% if r.status == 'ok' %}<span class="badge badge-good">ok</span>
+        {% else %}<span class="badge badge-bad" title="{{ r.error[:200] }}">{{ r.status }}</span>{% endif %}
+        {% if r.langsmith_url %}<a class="small" href="{{ r.langsmith_url }}" rel="noopener">trace</a>{% endif %}
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="11" class="muted">No agent runs yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>

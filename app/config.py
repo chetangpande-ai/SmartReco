@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     )
 
     app_env: str = "development"
+    base_url: str = "http://localhost:8000"  # absolute links in emails
     secret_key: str = "dev-only-change-me"
     log_level: str = "INFO"
     log_json: bool = False
@@ -84,12 +85,18 @@ class Settings(BaseSettings):
     # Cut relative to the best hit so the floor travels across embedding models
     # instead of being tuned to one, with a small absolute floor underneath.
     #
-    # Swept against the live index over 10 paraphrase probes (scripts/eval_retrieval.py):
-    # recall@1 held at 7/10 and recall@5 at 8/10 for every ratio from 0.0 to 0.6, while
-    # the candidate pool fell from 31.7 to 5.0. So this buys precision and latency at no
-    # cost in recall — 0.35 is the middle of that flat region rather than its edge,
-    # which leaves headroom for catalogues whose score distributions differ.
-    retrieval_score_ratio: float = 0.35
+    # Swept against the live index over 20 paraphrase probes (`make sweep`). Recall
+    # *improves* monotonically as the floor tightens, because with 35 products and a
+    # pool of 30 nearly the whole catalogue counts as a vector hit, so those ranks are
+    # noise that dilutes rank fusion:
+    #     ratio  0.00  0.35  0.45  0.50  0.55  0.65  0.80
+    #     r@3    0.85  0.85  0.85  0.85  0.95  1.00  1.00
+    #     r@5    0.90  0.90  0.90  1.00  1.00  1.00  1.00
+    #     pool   30.1  24.2  15.9  12.4   9.2   5.0   2.5
+    # 0.55 takes most of the gain while leaving MMR a pool worth diversifying over;
+    # past 0.65 the vector side nearly vanishes and BM25 is effectively deciding alone.
+    # Tuned on one catalogue — re-run `make sweep` if the catalogue changes shape.
+    retrieval_score_ratio: float = 0.55
     retrieval_min_score: float = 0.10
     retrieval_grade_threshold: float = 0.60
     retrieval_max_refines: int = 2
@@ -102,9 +109,14 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     smtp_starttls: bool = True
     mail_from: str = "SmartReco <no-reply@smartreco.local>"
+    mail_backend: str = "auto"  # auto | smtp | file | ses
+    aws_region: str = "us-east-1"
     digest_hour: int = 16
     digest_minute: int = 0
+    digest_min_events: int = 3  # don't email someone who barely visited
     scheduler_enabled: bool = True
+    outbox_interval_seconds: int = 60
+    reconcile_interval_minutes: int = 60
 
     # ---- Guardrails. The deterministic rails always run; NeMo costs tokens per
     # generation, so it is opt-in.

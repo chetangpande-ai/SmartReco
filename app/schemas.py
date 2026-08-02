@@ -18,7 +18,7 @@ EVENT_TYPES = frozenset(
         "dwell",
         "scroll_depth",
         "add_to_cart",
-        "enroll",
+        "purchase",
         "rec_impression",
         "rec_click",
     }
@@ -48,40 +48,51 @@ class EventIn(BaseModel):
     @field_validator("meta")
     @classmethod
     def _bounded_meta(cls, v: dict) -> dict:
-        # A tracker bug should not be able to write megabytes into the events table.
-        if len(v) > 20:
-            raise ValueError("meta has too many keys")
+        # Truncate rather than reject: a tracker bug should not be able to write
+        # megabytes into the events table, but it also should not cost us the event.
         return {k: v[k] for k in list(v)[:20]}
 
 
 class EventBatchIn(BaseModel):
-    events: list[EventIn] = Field(min_length=1, max_length=100)
+    """Events arrive as raw dicts and are validated one at a time in the router.
+
+    Validating the batch as `list[EventIn]` would mean a single malformed event — a
+    retired `type` from a tracker.js still sitting in someone's browser cache — returns
+    422 and discards up to 99 perfectly good events with it. Telemetry has to degrade
+    per-event, not per-batch.
+    """
+
+    events: list[dict] = Field(min_length=1, max_length=100)
     anon_id: str = Field(default="", max_length=64)
 
 
 class EventBatchAccepted(BaseModel):
     accepted: int
+    rejected: int = 0
     queued: bool = True
+
+
+TIERS = ("entry", "mid", "flagship")
 
 
 class ProductIn(BaseModel):
     title: str = Field(min_length=3, max_length=200)
     description: str = Field(default="", max_length=8000)
     category: str = Field(min_length=2, max_length=80)
-    level: str = Field(default="beginner")
+    tier: str = Field(default="entry")
     tags: list[str] = Field(default_factory=list)
-    price_cents: int = Field(default=0, ge=0, le=10_000_00)
-    instructor: str = Field(default="", max_length=120)
-    duration_minutes: int = Field(default=0, ge=0, le=100_000)
+    price_cents: int = Field(default=0, ge=0, le=1_000_000_00)
+    brand: str = Field(default="", max_length=120)
+    spec: str = Field(default="", max_length=200)
     rating: float = Field(default=0.0, ge=0.0, le=5.0)
     is_published: bool = True
 
-    @field_validator("level")
+    @field_validator("tier")
     @classmethod
-    def _known_level(cls, v: str) -> str:
+    def _known_tier(cls, v: str) -> str:
         v = v.lower().strip()
-        if v not in {"beginner", "intermediate", "advanced"}:
-            raise ValueError("level must be beginner, intermediate or advanced")
+        if v not in TIERS:
+            raise ValueError(f"tier must be one of {', '.join(TIERS)}")
         return v
 
     @field_validator("tags")
@@ -96,11 +107,11 @@ class ProductOut(BaseModel):
     title: str
     description: str
     category: str
-    level: str
+    tier: str
     tags: list[str]
     price_cents: int
-    instructor: str
-    duration_minutes: int
+    brand: str
+    spec: str
     rating: float
     is_published: bool
     vector_synced_at: datetime | None

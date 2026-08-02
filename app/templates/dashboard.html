@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Your picks — SmartReco{% endblock %}
+{% block body_attrs %}data-poll-recs="{{ 1 if pending else 0 }}"{% endblock %}
+
+{% block content %}
+<section class="rec-head">
+  <div>
+    <h1>Picked for you, {{ user.name or user.email }}</h1>
+    <p class="muted">
+      {% if rec %}
+        Refreshed {{ rec.created_at.strftime('%d %b, %H:%M') }} ·
+        <span class="pill pill-cat">{{ rec.strategy }}</span>
+        {% if rec.model %}<span class="pill pill-plain">{{ rec.model }}</span>{% endif %}
+        <span class="pill pill-plain">confidence {{ '%.0f'|format(rec.confidence * 100) }}%</span>
+      {% else %}
+        Browse a few products and your recommendations will build themselves.
+      {% endif %}
+    </p>
+  </div>
+  <form method="post" action="/me/refresh">
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    <button class="btn btn-ghost" type="submit">Refresh</button>
+  </form>
+</section>
+
+{% if pending or request.query_params.get('refreshing') %}
+<div class="banner" id="rec-pending">
+  <span class="spinner"></span> The agent is reading your activity — this takes a few seconds.
+</div>
+{% endif %}
+
+{% if rec %}
+<article class="rec" id="rec-block" data-rec-id="{{ rec.id }}">
+  <h2 class="rec-headline">{{ rec.headline }}</h2>
+  <p class="rec-narrative">{{ rec.narrative }}</p>
+
+  <div class="grid rec-grid">
+    {% for entry in items %}
+      {% set p = entry.product %}
+      <article class="card card-rec" data-track-impression
+               data-product-slug="{{ p.slug }}" data-position="{{ entry.rank }}">
+        <a class="card-link" href="/products/{{ p.slug }}"
+           data-track-click="rec_click" data-product-slug="{{ p.slug }}"
+           data-position="{{ entry.rank }}" data-source="recommendation">
+          <div class="card-top">
+            <span class="pill pill-{{ p.tier }}">{{ p.tier }}</span>
+            <span class="pill pill-cat">{{ p.category.replace('-', ' ') }}</span>
+          </div>
+          <h3 class="card-title">{{ p.title }}</h3>
+          <p class="rec-reason">{{ entry.reason }}</p>
+          <div class="card-foot">
+            <span class="price">{{ p.price_cents|money }}</span>
+            <span class="muted">★ {{ '%.1f'|format(p.rating) }}</span>
+          </div>
+        </a>
+      </article>
+    {% endfor %}
+  </div>
+
+  {% if rec.cta %}<p class="rec-cta">{{ rec.cta }}</p>{% endif %}
+</article>
+{% elif not pending %}
+<div class="empty-state">
+  <h2>Nothing yet</h2>
+  <p class="muted">
+    SmartReco needs a little behaviour to work with. Browse the shop, search for
+    something you're actually after, and your recommendations will appear here.
+  </p>
+  <a class="btn btn-primary" href="/">Start browsing</a>
+</div>
+{% endif %}
+
+<section class="why">
+  <h2 class="section-title">Why these?</h2>
+  {% if evidence %}
+    <p class="muted">These are the only signals the agent was allowed to use — nothing else.</p>
+    <ul class="evidence">
+      {% for fact in evidence %}<li>You {{ fact }}</li>{% endfor %}
+    </ul>
+  {% else %}
+    <p class="muted">No activity recorded yet.</p>
+  {% endif %}
+
+  {% if profile and profile.interests %}
+  <div class="interest-bars">
+    {% set top = profile.interests.values()|list %}
+    {% set peak = top[0] if top else 1 %}
+    {% for name, score in profile.interests.items() %}
+      {% if loop.index <= 6 %}
+      <div class="bar-row">
+        <span class="bar-label">{{ name }}</span>
+        <span class="bar"><span class="bar-fill" style="width: {{ (score / peak * 100)|round }}%"></span></span>
+        <span class="bar-value">{{ '%.1f'|format(score) }}</span>
+      </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+  <p class="muted">
+    Scores decay with a 48-hour half-life, so this reflects what you're into now, not
+    what you looked at last month.
+  </p>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}<script src="/static/js/dashboard.js" defer></script>{% endblock %}

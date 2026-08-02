@@ -1,20 +1,21 @@
 {% macro product_card(p, position=0, source='catalog', impression=false) -%}
 <article class="card"
          {% if impression %}data-track-impression data-product-slug="{{ p.slug }}" data-position="{{ position }}"{% endif %}>
-  <a class="card-link" href="/courses/{{ p.slug }}"
+  <a class="card-link" href="/products/{{ p.slug }}"
      data-track-click="product_click"
      data-product-slug="{{ p.slug }}"
      data-position="{{ position }}"
      data-source="{{ source }}">
     <div class="card-top">
-      <span class="pill pill-{{ p.level }}">{{ p.level }}</span>
-      <span class="pill pill-cat">{{ p.category }}</span>
+      <span class="pill pill-{{ p.tier }}">{{ p.tier }}</span>
+      <span class="pill pill-cat">{{ p.category.replace('-', ' ') }}</span>
     </div>
     <h3 class="card-title">{{ p.title }}</h3>
-    <p class="card-desc">{{ p.description|truncate(110) }}</p>
+    {% if p.spec %}<p class="card-spec">{{ p.spec }}</p>{% endif %}
+    <p class="card-desc">{{ p.description|truncate(96) }}</p>
     <div class="card-foot">
       <span class="price">{{ p.price_cents|money }}</span>
-      <span class="muted">★ {{ '%.1f'|format(p.rating) }} · {{ p.duration_minutes // 60 }}h</span>
+      <span class="muted">★ {{ '%.1f'|format(p.rating) }}</span>
     </div>
   </a>
 </article>

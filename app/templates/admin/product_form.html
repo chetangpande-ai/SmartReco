@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if product else 'New' }} product — SmartReco admin{% endblock %}
+
+{% block content %}
+<div class="admin-head">
+  <h1>{{ 'Edit product' if product else 'New product' }}</h1>
+  <nav class="admin-nav"><a class="nav-link" href="/admin/products">Back to catalogue</a></nav>
+</div>
+
+{% if error %}<p class="alert">{{ error }}</p>{% endif %}
+
+<form method="post" class="product-form"
+      action="{{ '/admin/products/' ~ product.id if product else '/admin/products' }}">
+  <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+
+  <div class="form-row">
+    <label>Product name
+      <input type="text" name="title" required minlength="3" maxlength="200"
+             value="{{ product.title if product else '' }}">
+    </label>
+    <label>Brand
+      <input type="text" name="brand" value="{{ product.brand if product else '' }}">
+    </label>
+  </div>
+
+  <label>Spec line <small class="muted">short, separated by ·</small>
+    <input type="text" name="spec" maxlength="200"
+           placeholder="30h battery · adaptive ANC · Bluetooth 5.2 · 250g"
+           value="{{ product.spec if product else '' }}">
+    <small class="muted">These are the only specifications the agent is allowed to quote.</small>
+  </label>
+
+  <label>Description
+    <textarea name="description" rows="6"
+              placeholder="What it's actually like to own, and who it suits.">{{ product.description if product else '' }}</textarea>
+    <small class="muted">This text is embedded for semantic search — specific beats generic.</small>
+  </label>
+
+  <div class="form-row">
+    <label>Category
+      <input type="text" name="category" required placeholder="audio, phones, laptops…"
+             value="{{ product.category if product else '' }}">
+    </label>
+    <label>Tier
+      <select name="tier">
+        {% for t in ['entry', 'mid', 'flagship'] %}
+          <option value="{{ t }}" {{ 'selected' if product and product.tier == t else '' }}>{{ t }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </div>
+
+  <label>Tags <small class="muted">comma separated</small>
+    <input type="text" name="tags" placeholder="noise-cancelling, over-ear, wireless"
+           value="{{ product.tags|join(', ') if product else '' }}">
+  </label>
+
+  <div class="form-row">
+    <label>Price (USD)
+      <input type="number" name="price" step="1" min="0"
+             value="{{ '%.0f'|format(product.price_cents / 100) if product else '0' }}">
+    </label>
+    <label>Rating
+      <input type="number" name="rating" step="0.1" min="0" max="5"
+             value="{{ '%.1f'|format(product.rating) if product else '0' }}">
+    </label>
+  </div>
+
+  <label class="check">
+    <input type="checkbox" name="is_published" {{ 'checked' if not product or product.is_published else '' }}>
+    Published — unpublishing removes it from the vector store as well
+  </label>
+
+  <button class="btn btn-primary" type="submit">{{ 'Save changes' if product else 'Create product' }}</button>
+</form>
+{% endblock %}

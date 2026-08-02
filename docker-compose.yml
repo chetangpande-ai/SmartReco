@@ -1,0 +1,50 @@
+# Default: one container, SQLite on a volume. Nothing else needed.
+#     docker compose up --build
+#
+# Postgres instead, without touching the image:
+#     docker compose --profile postgres up --build
+#
+# The app is identical either way — only DATABASE_URL changes.
+
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      APP_ENV: production
+      DATABASE_URL: ${DATABASE_URL:-sqlite+pysqlite:////app/data/smartreco.db}
+      CHROMA_DIR: /app/data/chroma
+      BASE_URL: ${BASE_URL:-http://localhost:8000}
+    volumes:
+      - smartreco-data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=4).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  postgres:
+    image: postgres:16-alpine
+    profiles: ["postgres"]
+    environment:
+      POSTGRES_USER: smartreco
+      POSTGRES_PASSWORD: smartreco
+      POSTGRES_DB: smartreco
+    ports:
+      - "5432:5432"
+    volumes:
+      - smartreco-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smartreco"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  smartreco-data:
+  smartreco-pg:

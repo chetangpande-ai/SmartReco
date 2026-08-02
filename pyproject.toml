@@ -72,6 +72,9 @@ ignore = [
     "E501",   # line length is the formatter's job
     "B008",   # FastAPI Depends() in defaults is the documented idiom
     "SIM108", # ternaries are not always more readable
+    # A chain of guard clauses that each `return False` reads better than folding the
+    # last one into `return not (...)`. Consistency across the guards beats one line.
+    "SIM103",
 ]
 
 [tool.pytest.ini_options]

@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}Operations — SmartReco admin{% endblock %}
+
+{% block content %}
+<div class="admin-head">
+  <h1>Operations</h1>
+  <nav class="admin-nav">
+    <a class="nav-link" href="/admin/products">Catalogue</a>
+    <a class="nav-link" href="/admin/agent-runs">Agent runs</a>
+    <a class="nav-link" href="/metrics">Metrics</a>
+    <a class="nav-link" href="/readyz">Readiness</a>
+  </nav>
+</div>
+
+<div class="stat-row">
+  {% for label, value in counts.items() %}
+  <div class="stat"><span class="stat-value">{{ '{:,}'.format(value) }}</span><span class="stat-label">{{ label }}</span></div>
+  {% endfor %}
+</div>
+
+<div class="panels">
+  <section class="panel">
+    <div class="panel-head">
+      <h2>SQL ↔ vector sync</h2>
+      <span class="badge {{ 'badge-good' if sync.in_sync else 'badge-bad' }}">
+        {{ 'in sync' if sync.in_sync else 'drift' }}
+      </span>
+    </div>
+    <dl class="kv">
+      <dt>Published products (SQL)</dt><dd>{{ sync.sql_published }}</dd>
+      <dt>Vectors indexed</dt><dd>{{ sync.vector_count }}</dd>
+      <dt>Awaiting sync</dt><dd>{{ sync.pending }}</dd>
+      <dt>Never synced</dt><dd>{{ sync.unsynced_products }}</dd>
+      <dt>Dead-lettered</dt><dd class="{{ 'text-bad' if sync.dead else '' }}">{{ sync.dead }}</dd>
+      <dt>Backend</dt><dd>{{ sync.store.backend }}</dd>
+      <dt>Embedder</dt><dd class="mono small">{{ sync.store.embedder }}</dd>
+    </dl>
+    {% if dead_rows %}
+    <details class="dead">
+      <summary>{{ dead_rows|length }} dead outbox row(s)</summary>
+      <ul>{% for r in dead_rows %}
+        <li class="mono small">#{{ r.id }} {{ r.op }} product={{ r.product_id }} — {{ r.last_error[:120] }}</li>
+      {% endfor %}</ul>
+    </details>
+    {% endif %}
+    <div class="panel-actions">
+      <form method="post" action="/admin/reconcile" class="inline">
+        <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+        <button class="btn btn-ghost" type="submit">Reconcile</button>
+      </form>
+      <form method="post" action="/admin/reindex" class="inline">
+        <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+        <button class="btn btn-ghost" type="submit">Full reindex</button>
+      </form>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>LLM call efficiency</h2>
+      <span class="badge badge-good">{{ efficiency.avoided_pct }}% avoided</span>
+    </div>
+    <p class="muted">
+      Since this process started: <strong>{{ efficiency.agent_runs }}</strong> agent run(s)
+      out of <strong>{{ efficiency.considered }}</strong> opportunities. Every skip below is
+      a model call the trigger policy decided was not worth making.
+    </p>
+    {% if efficiency.by_reason %}
+    <table class="mini">
+      <tbody>
+      {% for reason, count in efficiency.by_reason.items() %}
+        <tr><td>{{ reason.replace('_', ' ') }}</td><td class="num">{{ count }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<p class="muted">No decisions recorded yet.</p>{% endif %}
+    <dl class="kv">
+      {% if efficiency.runs_all_time is not none %}
+      <dt>Runs all time <span class="muted small">(db)</span></dt><dd>{{ efficiency.runs_all_time }}</dd>
+      <dt>Spend all time <span class="muted small">(db)</span></dt><dd>${{ '%.5f'|format(efficiency.spend_all_time_usd) }}</dd>
+      {% endif %}
+      <dt>Spend today</dt><dd>${{ '%.5f'|format(efficiency.spend_today_usd) }}</dd>
+      <dt>Budget remaining</dt><dd>${{ '%.5f'|format(efficiency.budget_remaining_usd) }}</dd>
+      <dt>Circuit breaker</dt>
+      <dd class="{{ 'text-bad' if llm.circuit_open else 'text-good' }}">{{ 'open' if llm.circuit_open else 'closed' }}</dd>
+      <dt>Model</dt><dd class="mono small">{{ llm.model }}</dd>
+      <dt>Fast model</dt><dd class="mono small">{{ llm.model_fast }}</dd>
+    </dl>
+  </section>
+
+  <section class="panel">
+    <h2>Agent graph</h2>
+    <p class="muted">Read from the compiled LangGraph, so it cannot drift from what runs.</p>
+    <div class="chips">
+      {% for n in graph.nodes %}<span class="chip">{{ n }}</span>{% endfor %}
+    </div>
+    <ul class="edges mono small">
+      {% for e in graph.edges %}
+        <li>{{ e.from }} → {{ e.to }}{% if e.conditional %} <span class="muted">(conditional)</span>{% endif %}</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Scheduler</h2>
+      <span class="badge {{ 'badge-good' if jobs else 'badge-warn' }}">
+        {{ jobs|length ~ ' job(s)' if jobs else 'stopped' }}
+      </span>
+    </div>
+    {% if jobs %}
+    <table class="mini">
+      <tbody>
+      {% for j in jobs %}
+        <tr>
+          <td>{{ j.id.replace('_', ' ') }}<div class="mono small muted">{{ j.trigger }}</div></td>
+          <td class="small">{{ j.next_run[:19].replace('T', ' ') if j.next_run else '—' }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<p class="muted">Scheduler is not running (SCHEDULER_ENABLED=false).</p>{% endif %}
+
+    <dl class="kv">
+      <dt>Mail backend</dt><dd>{{ mail_backend }}</dd>
+    </dl>
+    {% if mail_backend == 'file' %}
+    <p class="muted small">
+      SMTP is not configured, so digests are written to <span class="mono">data/outbox/</span>
+      instead of being sent. The rendering and scheduling path is identical.
+    </p>
+    {% endif %}
+
+    {% if notifications %}
+    <table class="mini">
+      <tbody>
+      {% for n in notifications %}
+        <tr>
+          <td class="small">{{ n.created_at.strftime('%d %b %H:%M') }} · user {{ n.user_id }}</td>
+          <td><span class="badge {{ 'badge-good' if n.status == 'sent' else 'badge-bad' }}">{{ n.status }}</span></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+
+    <div class="panel-actions">
+      <form method="post" action="/admin/send-digest" class="inline">
+        <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+        <button class="btn btn-ghost" type="submit">Run digest now</button>
+      </form>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Events captured</h2>
+    {% if events_by_type %}
+    <table class="mini">
+      <tbody>
+      {% for t, c in events_by_type.items() %}
+        <tr><td>{{ t.replace('_', ' ') }}</td><td class="num">{{ '{:,}'.format(c) }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<p class="muted">No events yet.</p>{% endif %}
+  </section>
+</div>
+
+<h2 class="section-title">Recent agent runs</h2>
+{% include "admin/_runs_table.html" %}
+{% endblock %}

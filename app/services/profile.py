@@ -37,7 +37,7 @@ log = logging.getLogger(__name__)
 # Relative worth of each signal. Explicit intent (search, enrol) beats passive
 # exposure (page_view, impression) by design.
 EVENT_WEIGHTS = {
-    "enroll": 5.0,
+    "purchase": 5.0,
     "add_to_cart": 3.0,
     "search": 2.0,
     "search_result_click": 1.8,
@@ -79,10 +79,11 @@ def refresh(db: Session, user_id: int) -> UserProfile | None:
             Event.server_ts,
             Event.product_id,
             Product.category,
-            Product.level,
+            Product.tier,
             Product.price_cents,
             Product.tags,
             Product.title,
+            Product.brand,
         )
         .join(Product, Event.product_id == Product.id, isouter=True)
         .where(Event.user_id == user_id, Event.server_ts >= since)
@@ -100,7 +101,8 @@ def refresh(db: Session, user_id: int) -> UserProfile | None:
     interests: dict[str, float] = defaultdict(float)
     tag_scores: dict[str, float] = defaultdict(float)
     term_scores: dict[str, float] = defaultdict(float)
-    level_scores: dict[str, float] = defaultdict(float)
+    tier_scores: dict[str, float] = defaultdict(float)
+    brand_scores: dict[str, float] = defaultdict(float)
     price_weighted, price_weight_total = 0.0, 0.0
     queries: list[str] = []
     viewed: list[int] = []
@@ -124,7 +126,9 @@ def refresh(db: Session, user_id: int) -> UserProfile | None:
 
         if r.category:
             interests[r.category] += weight
-            level_scores[r.level or ""] += weight
+            tier_scores[r.tier or ""] += weight
+            if r.brand:
+                brand_scores[r.brand] += weight
             for tag in r.tags or []:
                 tag_scores[tag] += weight
             for tok in tokenize(r.title):
@@ -134,7 +138,9 @@ def refresh(db: Session, user_id: int) -> UserProfile | None:
                 price_weight_total += weight
             if r.product_id and r.product_id not in viewed:
                 viewed.append(r.product_id)
-            centroid_inputs[f"{r.title}. {r.category}. {' '.join(r.tags or [])}"] += weight
+            centroid_inputs[
+                f"{r.title}. {r.brand}. {r.category}. {' '.join(r.tags or [])}"
+            ] += weight
 
         if r.type == "search" and r.query:
             q = r.query.strip()
@@ -155,7 +161,8 @@ def refresh(db: Session, user_id: int) -> UserProfile | None:
     profile.top_terms = [k for k, _ in _top(term_scores, 15)]
     profile.recent_queries = queries[:10]
     profile.viewed_product_ids = viewed[:40]
-    profile.level_affinity = max(level_scores, key=level_scores.get) if level_scores else ""
+    profile.tier_affinity = max(tier_scores, key=tier_scores.get) if tier_scores else ""
+    profile.brand_scores = {k: round(v, 4) for k, v in _top(brand_scores, 8)}
     profile.price_affinity_cents = (
         int(price_weighted / price_weight_total) if price_weight_total else 0
     )
@@ -244,9 +251,11 @@ def signature(profile: UserProfile) -> str:
     parts = [
         ",".join(list(profile.interests)[:3]),
         ",".join(list(profile.tag_scores)[:5]),
-        profile.level_affinity,
-        # Price bucketed to $25 bands: a $2 difference is not a different shopper.
-        str(profile.price_affinity_cents // 2500),
+        profile.tier_affinity,
+        ",".join(list(profile.brand_scores)[:2]),
+        # Price bucketed: a few dollars' difference is not a different shopper. Bands
+        # widen with price, because $20 matters on a $60 purchase and not on a $2000 one.
+        str(int((profile.price_affinity_cents / 100) ** 0.5) // 3),
     ]
     return hashlib.sha256("|".join(parts).encode()).hexdigest()
 
@@ -256,13 +265,15 @@ def summarise(profile: UserProfile) -> str:
     if not profile.interests:
         return "no activity yet"
     cats = ", ".join(f"{k} ({v:.1f})" for k, v in list(profile.interests.items())[:3])
-    bits = [f"interests: {cats}"]
+    bits = [f"shopping for: {cats}"]
     if profile.recent_queries:
         bits.append(f"searched: {'; '.join(profile.recent_queries[:3])}")
-    if profile.level_affinity:
-        bits.append(f"level: {profile.level_affinity}")
+    if profile.brand_scores:
+        bits.append(f"brands looked at: {', '.join(list(profile.brand_scores)[:3])}")
+    if profile.tier_affinity:
+        bits.append(f"tier: {profile.tier_affinity}")
     if profile.price_affinity_cents:
-        bits.append(f"typical price: ${profile.price_affinity_cents / 100:.0f}")
+        bits.append(f"typical price: ${profile.price_affinity_cents / 100:,.0f}")
     return " | ".join(bits)
 
 
@@ -277,7 +288,7 @@ def evidence(db: Session, user_id: int, limit: int = 8) -> list[str]:
     rows = db.execute(
         select(
             Event.type, Event.query, Event.dwell_ms, Event.product_id, Product.title,
-            Product.category, Product.level,
+            Product.category, Product.tier, Product.brand,
         )
         .join(Product, Event.product_id == Product.id, isouter=True)
         .where(Event.user_id == user_id, Event.server_ts >= since)
@@ -289,7 +300,8 @@ def evidence(db: Session, user_id: int, limit: int = 8) -> list[str]:
     views: dict[str, int] = defaultdict(int)
     dwell: dict[str, int] = defaultdict(int)
     categories: dict[str, int] = defaultdict(int)
-    levels: dict[str, int] = defaultdict(int)
+    tiers: dict[str, int] = defaultdict(int)
+    brands: dict[str, int] = defaultdict(int)
     intents: list[str] = []
 
     for r in rows:
@@ -298,12 +310,14 @@ def evidence(db: Session, user_id: int, limit: int = 8) -> list[str]:
         elif r.type in ("product_view", "product_click") and r.title:
             views[r.title] += 1
             categories[r.category] += 1
-            levels[r.level] += 1
+            tiers[r.tier] += 1
+            if r.brand:
+                brands[r.brand] += 1
         elif r.type == "dwell" and r.title:
             dwell[r.title] += r.dwell_ms
-        elif r.type in ("enroll", "add_to_cart") and r.title:
-            verb = "enrolled in" if r.type == "enroll" else "saved"
-            statement = f"{verb} '{r.title}'"
+        elif r.type in ("purchase", "add_to_cart") and r.title:
+            verb = "bought" if r.type == "purchase" else "added to your basket"
+            statement = f"{verb} the {r.title}"
             if statement not in intents:
                 intents.append(statement)
 
@@ -320,14 +334,18 @@ def evidence(db: Session, user_id: int, limit: int = 8) -> list[str]:
             )
             facts.append(f"spent {spent} reading '{title}'")
     for title, count in sorted(views.items(), key=lambda kv: -kv[1])[:3]:
-        facts.append(f"viewed '{title}'" + (f" {count} times" if count > 1 else ""))
+        facts.append(f"looked at the {title}" + (f" {count} times" if count > 1 else ""))
     if categories:
         top_cat, n = max(categories.items(), key=lambda kv: kv[1])
-        facts.append(f"opened {n} {top_cat} courses")
-    if levels:
-        top_level, n = max(levels.items(), key=lambda kv: kv[1])
+        facts.append(f"opened {n} {top_cat.replace('-', ' ')} product{'s' if n != 1 else ''}")
+    if brands:
+        top_brand, n = max(brands.items(), key=lambda kv: kv[1])
         if n >= 2:
-            facts.append(f"favour {top_level} material")
+            facts.append(f"keep coming back to {top_brand}")
+    if tiers:
+        top_tier, n = max(tiers.items(), key=lambda kv: kv[1])
+        if n >= 2:
+            facts.append(f"favour {top_tier}-tier models")
 
     # Every fact is phrased as a bare past-tense predicate so callers can prefix it with
     # "You " and get a sentence. The fallback copy writer depends on that.

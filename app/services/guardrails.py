@@ -50,6 +50,14 @@ _FORBIDDEN = [
     (r"\b(double|triple|10x|5x)\s+(your\s+)?(salary|income|pay)\b", "earnings promise"),
     (r"\bget\s+hired\s+(guaranteed|immediately|instantly)", "employment promise"),
     (r"\bsecret\s+(that|the\s+\w+\s+don'?t\s+want)", "conspiracy framing"),
+    # Real products invite comparative claims the catalogue cannot support. "Best fit
+    # for you" is fine and stays; "best on the market" is an assertion about products
+    # we hold no data on.
+    (r"\bbest\s+(on\s+the\s+market|in\s+(the\s+)?(world|class)|available\s+anywhere)\b",
+     "unsupported superlative"),
+    (r"\b(unmatched|unbeatable|second\s+to\s+none)\b", "unsupported superlative"),
+    (r"\bbeats?\s+(every|all|any)\s+\w+", "unsupported comparison"),
+    (r"\bworld'?s\s+(best|fastest|finest)\b", "unsupported superlative"),
 ]
 
 # Manufactured urgency and scarcity. The catalogue has no stock and no sales.

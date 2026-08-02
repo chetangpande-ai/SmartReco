@@ -24,12 +24,12 @@ COLLECTION = "smartreco_products"
 @dataclass
 class Filter:
     categories: list[str] | None = None
-    levels: list[str] | None = None
+    tiers: list[str] | None = None
     max_price_cents: int | None = None
     exclude_ids: list[int] | None = None
 
     def is_empty(self) -> bool:
-        return not (self.categories or self.levels or self.max_price_cents or self.exclude_ids)
+        return not (self.categories or self.tiers or self.max_price_cents or self.exclude_ids)
 
 
 @dataclass
@@ -141,8 +141,8 @@ class ChromaStore:
         clauses: list[dict] = []
         if flt.categories:
             clauses.append({"category": {"$in": flt.categories}})
-        if flt.levels:
-            clauses.append({"level": {"$in": flt.levels}})
+        if flt.tiers:
+            clauses.append({"tier": {"$in": flt.tiers}})
         if flt.max_price_cents is not None:
             clauses.append({"price_cents": {"$lte": flt.max_price_cents}})
         if flt.exclude_ids:
@@ -262,8 +262,8 @@ class PineconeStore:
         f: dict = {}
         if flt.categories:
             f["category"] = {"$in": flt.categories}
-        if flt.levels:
-            f["level"] = {"$in": flt.levels}
+        if flt.tiers:
+            f["tier"] = {"$in": flt.tiers}
         if flt.max_price_cents is not None:
             f["price_cents"] = {"$lte": flt.max_price_cents}
         if flt.exclude_ids:

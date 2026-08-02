@@ -25,7 +25,6 @@ from app.models import (
     rec_expiry,
     utcnow,
 )
-from app.services import profile as profile_service
 from app.services import triggers
 
 log = logging.getLogger(__name__)

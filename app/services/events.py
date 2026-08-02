@@ -11,9 +11,10 @@ Drops are counted, not silent.
 """
 
 import asyncio
+import contextlib
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -48,10 +49,8 @@ class EventIngestor:
         if self._worker is None:
             return
         self._worker.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await self._worker
-        except asyncio.CancelledError:
-            pass
         # Drain whatever is still queued so a clean shutdown doesn't lose the last batch.
         if self._queue and not self._queue.empty():
             rows = []
@@ -177,7 +176,7 @@ def to_row(event, *, user_id: int | None, anon_id: str, path_fallback: str = "")
         # Clients occasionally send seconds, or a clock that is wildly wrong. Anything
         # implausible is dropped rather than poisoning the recency decay.
         try:
-            client_ts = datetime.fromtimestamp(event.ts / 1000, tz=timezone.utc)
+            client_ts = datetime.fromtimestamp(event.ts / 1000, tz=UTC)
             if not (2020 < client_ts.year < 2100):
                 client_ts = None
         except (ValueError, OSError, OverflowError):

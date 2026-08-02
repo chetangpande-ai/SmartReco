@@ -8,13 +8,13 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app import metrics
+from app import metrics, scheduler
 from app.config import ROOT, settings
 from app.db import SessionLocal, init_db
 from app.deps import ANON_COOKIE, new_anon_id
 from app.logging_conf import configure_logging, new_request_id, request_id_var
 from app.models import User
-from app.routers import auth, events, health, pages
+from app.routers import admin, auth, events, health, pages, recommendations
 from app.security import (
     CSRF_COOKIE,
     SESSION_COOKIE,
@@ -42,11 +42,13 @@ async def lifespan(app: FastAPI):
     configure_logging()
     init_db()
     await ingestor.start()
+    scheduler.start()
     log.info(
         "smartreco up",
         extra={"env": settings.app_env, "llm": settings.has_llm, "model": settings.meshapi_model},
     )
     yield
+    scheduler.shutdown()
     await ingestor.stop()
 
 
@@ -61,6 +63,8 @@ app.mount("/static", StaticFiles(directory=str(ROOT / "app" / "static")), name="
 app.include_router(health.router)
 app.include_router(events.router)
 app.include_router(auth.router)
+app.include_router(recommendations.router)
+app.include_router(admin.router)
 app.include_router(pages.router)
 
 
@@ -119,12 +123,27 @@ def _load_user(request: Request) -> User | None:
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     """Browsers get a redirect to the login page; fetch/XHR gets JSON. One dependency
-    (`require_user`) then serves both the pages and the API."""
-    wants_html = "text/html" in request.headers.get("accept", "")
+    (`require_user`) then serves both the pages and the API.
+
+    Path is checked as well as Accept because Accept is not reliable — clients send
+    `*/*`, and a navigation that 401s would then dump raw JSON into the viewport
+    instead of showing a login page. Everything under /api/ is machine-facing by
+    construction, so that split is the dependable signal.
+    """
+    is_api = request.url.path.startswith("/api/")
+    wants_html = not is_api or "text/html" in request.headers.get("accept", "")
     if exc.status_code == 401 and wants_html:
         return RedirectResponse(f"/login?next={request.url.path}", status_code=303)
     if wants_html and exc.status_code in (403, 404):
         from app.templating import render
 
-        return render(request, "error.html", code=exc.status_code, detail=exc.detail)
+        # status_code must be forwarded: an error page served as 200 is invisible to
+        # monitoring and tells crawlers the missing page exists.
+        return render(
+            request,
+            "error.html",
+            status_code=exc.status_code,
+            code=exc.status_code,
+            detail=exc.detail,
+        )
     return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)

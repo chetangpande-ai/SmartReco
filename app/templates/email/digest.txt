@@ -1,0 +1,16 @@
+{{ rec.headline }}
+
+{{ rec.narrative }}
+
+{% for entry in items %}{{ loop.index }}. {{ entry.product.title }} — ${{ '%.0f'|format(entry.product.price_cents / 100) }} ({{ entry.product.brand }}, {{ entry.product.tier }} tier)
+   {{ entry.reason }}
+   {{ base_url }}/products/{{ entry.product.slug }}
+
+{% endfor %}
+{{ rec.cta or 'See all your picks' }}: {{ base_url }}/me
+
+---
+Why you're seeing this:
+{% for fact in evidence %}- You {{ fact }}
+{% endfor %}
+Sent because you have digests turned on. Manage preferences at {{ base_url }}/me

@@ -6,7 +6,7 @@ consistent, and JS can never read the token, so an XSS bug cannot exfiltrate it.
 
 import hmac
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import bcrypt
 import jwt
@@ -32,7 +32,7 @@ def verify_password(password: str, password_hash: str) -> bool:
 
 
 def create_session_token(user_id: int, role: str) -> str:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return jwt.encode(
         {"sub": str(user_id), "role": role, "iat": now, "exp": now + SESSION_TTL},
         settings.secret_key,

@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install dependencies
+        run: uv sync --frozen --all-extras
+
+      - name: Lint
+        run: uv run ruff check app tests scripts
+
+      # The suite runs with LLM_ENABLED=false: the deterministic embedder and
+      # template copy writer make it hermetic, so CI needs no MESH_API_KEY and
+      # spends nothing. The Mesh client itself is covered against a stub.
+      - name: Tests
+        run: uv run pytest tests/ -q --cov=app --cov-report=term-missing --cov-fail-under=80
+
+      - name: Migrations build the schema from scratch
+        env:
+          DATABASE_URL: sqlite+pysqlite:///./data/ci.db
+        run: |
+          mkdir -p data
+          uv run alembic upgrade head
+          uv run python -c "
+          from sqlalchemy import create_engine, inspect
+          tables = set(inspect(create_engine('sqlite+pysqlite:///./data/ci.db')).get_table_names())
+          expected = {'users','products','events','user_profiles','recommendations',
+                      'recommendation_items','agent_runs','vector_outbox','notifications',
+                      'embedding_cache'}
+          assert expected <= tables, f'missing: {expected - tables}'
+          print(f'{len(expected)} tables created')"
+
+      - name: Seed and verify the dual write stays consistent
+        env:
+          LLM_ENABLED: "false"
+          DATABASE_URL: sqlite+pysqlite:///./data/seed.db
+          CHROMA_DIR: ./data/ci-chroma
+        run: |
+          uv run python -m app.seed
+          uv run python -c "
+          from app.services import outbox
+          health = outbox.health()
+          print(health)
+          assert health['in_sync'], 'SQL and the vector store diverged'
+          assert health['sql_published'] == health['vector_count']
+          assert health['dead'] == 0"
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: smartreco:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Container starts and reports healthy
+        run: |
+          docker run -d --name smartreco -p 8000:8000 \
+            -e SECRET_KEY=ci-secret -e LLM_ENABLED=false -e SCHEDULER_ENABLED=false \
+            smartreco:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/healthz > /dev/null; then
+              echo "healthy after ${i}s"; curl -s http://localhost:8000/healthz; exit 0
+            fi
+            sleep 1
+          done
+          echo "did not become healthy"; docker logs smartreco; exit 1
