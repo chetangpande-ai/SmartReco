@@ -10,7 +10,7 @@ import logging
 from fastapi import APIRouter, Response
 from sqlalchemy import text
 
-from app import metrics
+from app import metrics, observability
 from app.db import engine
 from app.services.events import ingestor
 from app.services.mesh import mesh
@@ -45,6 +45,7 @@ def readyz(response: Response) -> dict:
     # Not a dependency: the agent degrades to deterministic copy without Mesh, so a
     # dead gateway must not take the whole app out of the load balancer.
     checks["llm"] = mesh.status()
+    checks["tracing"] = observability.status()
     checks["ingest_queue_depth"] = ingestor.depth
     checks["events_dropped"] = ingestor.dropped
 

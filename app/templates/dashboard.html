@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_media.html" import media %}
 {% block title %}Your picks — SmartReco{% endblock %}
 {% block body_attrs %}data-poll-recs="{{ 1 if pending else 0 }}"{% endblock %}
 
@@ -27,6 +28,11 @@
 <div class="banner" id="rec-pending">
   <span class="spinner"></span> The agent is reading your activity — this takes a few seconds.
 </div>
+{% if not rec %}
+<div class="skeleton-grid">
+  {% for _ in range(4) %}<div class="skeleton"></div>{% endfor %}
+</div>
+{% endif %}
 {% endif %}
 
 {% if rec %}
@@ -42,15 +48,18 @@
         <a class="card-link" href="/products/{{ p.slug }}"
            data-track-click="rec_click" data-product-slug="{{ p.slug }}"
            data-position="{{ entry.rank }}" data-source="recommendation">
-          <div class="card-top">
-            <span class="pill pill-{{ p.tier }}">{{ p.tier }}</span>
-            <span class="pill pill-cat">{{ p.category.replace('-', ' ') }}</span>
-          </div>
-          <h3 class="card-title">{{ p.title }}</h3>
-          <p class="rec-reason">{{ entry.reason }}</p>
-          <div class="card-foot">
-            <span class="price">{{ p.price_cents|money }}</span>
-            <span class="muted">★ {{ '%.1f'|format(p.rating) }}</span>
+          {{ media(p) }}
+          <div class="card-body">
+            <div class="card-top">
+              <span class="pill pill-{{ p.tier }}">{{ p.tier }}</span>
+              <span class="pill pill-cat">{{ p.category.replace('-', ' ') }}</span>
+            </div>
+            <h3 class="card-title">{{ p.title }}</h3>
+            <p class="rec-reason">{{ entry.reason }}</p>
+            <div class="card-foot">
+              <span class="price">{{ p.price_cents|money }}</span>
+              <span class="muted">★ {{ '%.1f'|format(p.rating) }}</span>
+            </div>
           </div>
         </a>
       </article>

@@ -125,10 +125,17 @@ class Settings(BaseSettings):
     # ---- Agent
     agent_mode: str = "langgraph"  # langgraph | deepagents
 
-    # ---- Observability
+    # ---- Observability. LangSmith traces the agent graph; Logfire traces the request
+    # around it (HTTP, SQL, Mesh) and can receive the graph too — see app/observability.py.
     langsmith_tracing: bool = False
     langsmith_api_key: str = ""
     langsmith_project: str = "smartreco"
+
+    logfire_enabled: bool = False
+    logfire_token: str = ""
+    logfire_project_name: str = "smartreco"
+    logfire_console: bool = False  # print spans to stdout instead of shipping them
+    logfire_instrument_langchain: bool = True
 
     @field_validator("secret_key")
     @classmethod
@@ -157,6 +164,10 @@ class Settings(BaseSettings):
     @property
     def has_smtp(self) -> bool:
         return bool(self.smtp_host)
+
+    @property
+    def has_tracing(self) -> bool:
+        return bool(self.langsmith_tracing and self.langsmith_api_key) or self.logfire_enabled
 
 
 @lru_cache

@@ -101,11 +101,68 @@ h1 { font-size: 1.9rem; }
   border-radius: var(--radius); overflow: hidden; transition: transform .12s ease, box-shadow .12s ease;
 }
 .card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
-.card-link { display: block; padding: 16px; height: 100%; }
+.card-link { display: flex; flex-direction: column; height: 100%; }
+.card-body { padding: 14px 16px 16px; display: flex; flex-direction: column; flex: 1; }
 .card-top { display: flex; gap: 6px; margin-bottom: 10px; }
 .card-title { font-size: 1rem; margin: 0 0 6px; }
 .card-desc { color: var(--muted); font-size: .85rem; margin: 0 0 14px; }
-.card-foot { display: flex; justify-content: space-between; align-items: baseline; }
+.card-foot { display: flex; justify-content: space-between; align-items: baseline; margin-top: auto; }
+
+/* ---- generated product tiles ----
+   Hue comes from the slug (see templating._hue), so an item always looks the same.
+   Real product photography belongs to the manufacturers; a deliberate generated tile
+   beats a broken image and adds no third-party requests. */
+.media {
+  position: relative; aspect-ratio: 16 / 10; display: grid; place-items: center;
+  background: linear-gradient(145deg,
+              hsl(var(--h) 58% 93%), hsl(calc(var(--h) + 32) 54% 86%));
+  color: hsl(var(--h) 42% 34%);
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+}
+.media svg { width: 34%; max-width: 88px; opacity: .82; }
+.media-brand {
+  position: absolute; left: 12px; bottom: 9px; font-size: .66rem; font-weight: 600;
+  letter-spacing: .09em; text-transform: uppercase; opacity: .55;
+}
+.media-hero {
+  aspect-ratio: 16 / 6; border: 1px solid var(--border); border-radius: var(--radius);
+  margin-bottom: 20px;
+}
+.media-hero svg { width: 16%; max-width: 104px; }
+.card:hover .media svg { transform: scale(1.06); }
+.media svg { transition: transform .18s ease; }
+@media (prefers-reduced-motion: reduce) { .media svg { transition: none; } }
+@media (prefers-color-scheme: dark) {
+  .media {
+    background: linear-gradient(145deg,
+                hsl(var(--h) 32% 20%), hsl(calc(var(--h) + 32) 30% 14%));
+    color: hsl(var(--h) 55% 74%);
+  }
+}
+
+/* ---- toast ---- */
+.toast-stack {
+  position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
+  display: grid; gap: 8px; z-index: 60; pointer-events: none;
+}
+.toast {
+  background: var(--text); color: var(--bg); padding: 10px 18px; border-radius: 999px;
+  font-size: .86rem; font-weight: 550; box-shadow: var(--shadow);
+  animation: toast-in .22s ease both;
+}
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
+
+/* ---- skeleton shown while the agent is running ---- */
+.skeleton-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(258px, 1fr)); gap: 16px; }
+.skeleton {
+  border: 1px solid var(--border); border-radius: var(--radius); height: 268px;
+  background: linear-gradient(100deg, var(--surface) 30%, var(--surface-2) 50%, var(--surface) 70%);
+  background-size: 220% 100%; animation: shimmer 1.4s linear infinite;
+}
+@keyframes shimmer { to { background-position: -120% 0; } }
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
 .price { font-weight: 650; }
 .pill {
   font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; font-weight: 600;

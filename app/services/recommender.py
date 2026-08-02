@@ -13,7 +13,6 @@ from sqlalchemy.orm import Session
 from app import metrics
 from app.agent.graph import graph
 from app.agent.state import new_state
-from app.agent.tracing import configure_tracing, current_run_url
 from app.config import settings
 from app.db import session_scope
 from app.logging_conf import new_request_id, request_id_var
@@ -25,6 +24,8 @@ from app.models import (
     rec_expiry,
     utcnow,
 )
+from app.observability import configure as configure_tracing
+from app.observability import current_run_url, traced
 from app.services import triggers
 
 log = logging.getLogger(__name__)
@@ -69,14 +70,14 @@ def generate_for_user(user_id: int, *, force: bool = False) -> Recommendation | 
 
     started = time.perf_counter()
     try:
-        final = graph.invoke(state)
+        final, trace_url = _invoke(state)
         error = final.get("error", "")
     except Exception as exc:
         # A failed agent run must not surface as a 500 on a page the user was browsing.
         # Record it, keep whatever they had, move on.
         log.exception("agent run failed", extra={"user_id": user_id})
         _record_run(user_id, None, decision.reason, {}, int((time.perf_counter() - started) * 1000),
-                    status="error", error=str(exc)[:1000], request_id=request_id)
+                    status="error", error=str(exc)[:1000], request_id=request_id, trace_url="")
         metrics.inc("smartreco_agent_runs_total", status="error")
         with session_scope() as db:
             return triggers.current_recommendation(db, user_id)
@@ -87,14 +88,15 @@ def generate_for_user(user_id: int, *, force: bool = False) -> Recommendation | 
         log.warning("agent produced nothing usable",
                     extra={"user_id": user_id, "error": error, "path": final.get("node_path")})
         _record_run(user_id, None, decision.reason, final, latency_ms,
-                    status="error", error=error or "no picks", request_id=request_id)
+                    status="error", error=error or "no picks", request_id=request_id,
+                    trace_url=trace_url)
         metrics.inc("smartreco_agent_runs_total", status="error")
         with session_scope() as db:
             return triggers.current_recommendation(db, user_id)
 
     rec_id = _persist(user_id, final, signature, centroid)
     _record_run(user_id, rec_id, decision.reason, final, latency_ms,
-                status="ok", error="", request_id=request_id)
+                status="ok", error="", request_id=request_id, trace_url=trace_url)
     metrics.inc("smartreco_agent_runs_total", status="ok")
 
     log.info(
@@ -111,6 +113,17 @@ def generate_for_user(user_id: int, *, force: bool = False) -> Recommendation | 
 
     with session_scope() as db:
         return db.get(Recommendation, rec_id)
+
+
+@traced("smartreco.recommend", run_type="chain")
+def _invoke(state: dict) -> tuple[dict, str]:
+    """One LangSmith run wrapping the whole graph, and the deep link read from inside it.
+
+    The link has to be captured here: `get_current_run_tree()` returns None the moment
+    invoke() returns, so reading it later — where it used to be read, next to the other
+    AgentRun fields — silently stored an empty string every time.
+    """
+    return graph.invoke(state), current_run_url()
 
 
 def _make_current(db: Session, user_id: int, rec_id: int) -> None:
@@ -188,6 +201,7 @@ def _record_run(
     status: str,
     error: str,
     request_id: str,
+    trace_url: str,
 ) -> None:
     with session_scope() as db:
         db.add(
@@ -206,7 +220,7 @@ def _record_run(
                 cost_usd=float(final.get("cost_usd", 0.0)),
                 latency_ms=latency_ms,
                 request_id=request_id,
-                langsmith_url=current_run_url(),
+                langsmith_url=trace_url,
                 error=error,
             )
         )

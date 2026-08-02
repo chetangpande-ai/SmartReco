@@ -217,7 +217,7 @@ token-bucket rate limiting; CSP and security headers.
 |---|---|
 | ⭐ **Structured agent framework** | LangGraph 1.2, 8 nodes, conditional edges, bounded refine + repair loops. `/admin` renders the graph **read from the compiled object**, so it cannot drift from what runs |
 | ⭐ **Scheduled proactive delivery** | APScheduler: digest at 16:00 UTC (with jitter), outbox drain 60 s, reconcile hourly. Idempotent via a unique `digest:<user>:<date>` key |
-| ⭐ **Observability** | LangSmith tracing (graph nodes + explicit spans around Mesh calls), plus a durable `agent_runs` table: node path, grade, refines, tokens, cost, latency, trace URL |
+| ⭐ **Observability** | **LangSmith** traces the graph (with the Mesh calls nested inside it as real `llm` runs), **Logfire** traces the request around it, and one run reaches both through LangSmith's OTel bridge. Plus a durable `agent_runs` table: node path, grade, refines, tokens, cost, latency, trace URL. [Details ↓](#observability-two-views-one-run) |
 | ⭐ **Retrieval polish** | Hybrid vector+BM25 → RRF → metadata filters → MMR → LLM re-rank. Relevance floor **tuned by sweep, not guessed** |
 | ➕ **Guardrails** | Deterministic rails always on (free, offline); NeMo Guardrails as an opt-in second layer, routed through Mesh |
 | ➕ **Two vector backends** | Chroma (default) and Pinecone behind one protocol |
@@ -291,12 +291,61 @@ happily recite specifications from training data that may be wrong or years stal
 generation prompt therefore states that catalogue facts are the *only* facts it may
 use, and the `spec` field exists so there is always something accurate to quote.
 
+### Observability: two views, one run
+
+Two backends, because they answer different questions and neither is complete alone.
+**LangSmith** shows the graph — which node ran, what the model was actually asked, why
+`verify` rejected a draft. **Logfire** shows the request that graph was serving — the
+HTTP span, the SQL underneath it, the Mesh call and its token count, on one timeline.
+
+They are joined rather than duplicated. Setting `LANGSMITH_TRACING_MODE=hybrid` makes
+the LangSmith SDK write each run to LangSmith *and* emit it as an OpenTelemetry span,
+which Logfire receives because Logfire owns the global tracer provider. One run, two
+places. Verified against the live project — the whole graph arrives, refine loops,
+guardrail repair and all:
+
+```
+smartreco.recommend                                          $0.000601
+  └ LangGraph
+     └ analyze → plan → retrieve → grade → generate → verify → finalize
+                          ChatOpenAI 673 tok ─┘        └─ 1447 tok
+```
+
+Mesh traffic leaves through the raw OpenAI SDK, not a LangChain model, so LangSmith
+would otherwise show chain nodes with nothing underneath them — no prompt, no tokens.
+`wrap_openai` on the Mesh client fixes that: the three calls in the run above appear as
+three `llm` runs totalling 2,747 tokens, which is exactly what `agent_runs` recorded
+independently. Logfire gets the same calls through `instrument_openai`.
+
+Two things here fail *silently*, which is why `app/observability.py` is one module and
+not two, and why they have tests:
+
+**Ordering.** `langsmith.Client` decides once, at construction, where its OTel spans go:
+adopt an existing global provider, or build its own pointed at LangSmith's OTLP endpoint.
+Configure Logfire after that and LangGraph spans never reach it — nothing errors, they
+just go elsewhere. `configure()` runs Logfire first and only then sets hybrid mode; set
+hybrid with no provider installed and every run lands in LangSmith *twice*.
+
+**Sinks.** `LOGFIRE_ENABLED=true` with no token and no console output builds a span per
+request and drops all of them — instrumentation overhead buying nothing. That is refused
+with a warning naming the fix rather than started. And `send_to_logfire` is pinned to
+`"if-token-present"`: the plain `True` makes Logfire open an interactive project setup,
+which in a container is a boot that hangs forever.
+
+The same wiring fixed a bug it exists to catch. `AgentRun.langsmith_url` had always
+stored `""`: it was read next to the other fields, after the graph returned, where
+`get_current_run_tree()` is already `None`. The link is now captured inside the traced
+call, and a regression test models exactly that distinction.
+
+`/readyz` reports which backends are live, so "are traces being recorded" is answerable
+without reading logs — the question you ask once the demo is already running.
+
 ---
 
 ## Testing
 
 ```bash
-make test     # 236 tests, offline, no API key, spends nothing
+make test     # 269 tests, offline, no API key, spends nothing
 make cov      # coverage report (83%)
 make eval     # retrieval quality against 20 paraphrase probes
 ```
@@ -308,8 +357,9 @@ make eval     # retrieval quality against 20 paraphrase probes
 | `test_storage.py` | embedding cache, vector stores, dual-write, outbox retry + dead-letter, all three drift classes |
 | `test_pipeline.py` | ingest, dedupe, decay, evidence, drift, signature, **all 11 trigger gates** |
 | `test_agent.py` | graph shape, groundedness verifier, repair bounding, end-to-end |
-| `test_digest.py` | audience, rendering, once-only delivery, scheduler |
+| `test_digest.py` | audience, rendering, once-only delivery, SMTP send path, scheduler |
 | `test_api.py` | HTTP: auth, CSRF, tracking ingest, admin access control, dual-write over HTTP |
+| `test_observability.py` | sink selection, the OTel bridge, and the two silent failure modes below |
 
 Several tests are explicitly labelled regressions for bugs found during the build — an
 unpublished product staying recommendable, a search-only shopper getting no interest
@@ -330,6 +380,8 @@ Everything is in `.env` (see `.env.example`). The knobs that matter most:
 | `REC_DRIFT_THRESHOLD` | `0.10` | Interest change needed to justify a call |
 | `RETRIEVAL_SCORE_RATIO` | `0.55` | Relevance floor, relative to the best hit |
 | `VECTOR_BACKEND` | `chroma` | or `pinecone` |
+| `LANGSMITH_TRACING` | `false` | `true` + an API key traces the graph |
+| `LOGFIRE_ENABLED` | `false` | Needs `LOGFIRE_TOKEN` **or** `LOGFIRE_CONSOLE=true` to do anything |
 | `MAIL_BACKEND` | `auto` | `auto` picks SMTP if configured, else the file sink |
 | `DIGEST_HOUR` | `16` | Daily digest, UTC |
 
@@ -357,6 +409,18 @@ suite does not need it.
 - **Pinecone is implemented but untested.** No API key was available. The filter
   translation and call shapes are written against the 9.1 signatures and unit-tested,
   but I have not run it against a live index. Chroma is fully exercised.
+- **SMTP has never talked to a real mail server.** No credentials were available, so
+  every run has used the file sink. The send path *is* covered against a stubbed
+  `smtplib.SMTP` — connection parameters, STARTTLS, login, and the multipart/alternative
+  structure with both text and HTML bodies — which catches the failures that actually
+  happen (missing plain-text part, wrong headers). What remains unproven is whether a
+  given provider accepts the mail. `SesNotifier` is likewise written but unexercised.
+- **Logfire is wired but has never shipped to the cloud.** No token was available. The
+  configuration, instrumentation and the LangSmith→OTel bridge are proven — the bridge
+  by inspecting which tracer LangSmith ends up holding, and by watching a real span come
+  out of the console exporter — but `logfire.pydantic.dev` has not received a trace from
+  this app. LangSmith, by contrast, is verified live: the full ten-node graph arrives in
+  the `smartreco` project.
 - **APScheduler assumes one process.** The jobs are individually safe to run
   concurrently (the outbox coalesces, reconcile is a diff, the digest has a unique
   key), so scaling out means changing the scheduler, not the jobs.
@@ -372,14 +436,18 @@ suite does not need it.
   speakers with each other, which is a genuinely fine distinction.
 - **Product names and specs are real, prices and ratings are illustrative.** This is a
   demo storefront, not a price comparison service.
+- **Product imagery is generated, not photographed.** Real product photography belongs
+  to the manufacturers, so each card renders a category glyph on a hue derived from the
+  product slug — deterministic, zero third-party requests, and compatible with the
+  strict CSP. It reads as a design choice rather than a missing asset.
 
 ---
 
 ## Stack
 
 FastAPI · SQLAlchemy 2 · SQLite/Postgres · Alembic · **Mesh API** (all model traffic) ·
-LangChain 1.3 · LangGraph 1.2 · LangSmith · Chroma · Pinecone · NeMo Guardrails ·
-APScheduler · Jinja2 · vanilla JS · uv · pytest · ruff · Docker
+LangChain 1.3 · LangGraph 1.2 · LangSmith · Logfire/OpenTelemetry · Chroma · Pinecone ·
+NeMo Guardrails · APScheduler · Jinja2 · vanilla JS · uv · pytest · ruff · Docker
 
 Code style follows [Andrej Karpathy's engineering philosophy](.claude/skills/karpathy-coding-style/SKILL.md);
 see [AGENTS.md](AGENTS.md).

@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_card.html" import product_card %}
+{% from "_media.html" import media %}
 {% block title %}{{ product.title }} — SmartReco{% endblock %}
 
 {# tracker.js reads these to emit product_view and to label the dwell event. #}
@@ -10,6 +11,7 @@
 {% block content %}
 <article class="detail">
   <div class="detail-main">
+    {{ media(product, 'hero') }}
     <div class="card-top">
       <span class="pill pill-{{ product.tier }}">{{ product.tier }}</span>
       <span class="pill pill-cat">{{ product.category.replace('-', ' ') }}</span>
@@ -35,9 +37,11 @@
       <dt>In stock</dt><dd>Yes</dd>
     </dl>
     <button class="btn btn-primary btn-block"
-            data-track-click="add_to_cart" data-product-slug="{{ product.slug }}">Add to basket</button>
+            data-track-click="add_to_cart" data-product-slug="{{ product.slug }}"
+            data-toast="Added to your basket">Add to basket</button>
     <button class="btn btn-ghost btn-block"
-            data-track-click="purchase" data-product-slug="{{ product.slug }}">Buy now</button>
+            data-track-click="purchase" data-product-slug="{{ product.slug }}"
+            data-toast="Thanks — order placed">Buy now</button>
   </aside>
 </article>
 

@@ -165,6 +165,21 @@ def extract_json(text: str) -> dict:
     return json.loads(cleaned[start : end + 1])
 
 
+def _traced_client(client: OpenAI) -> OpenAI:
+    """Return the client wrapped for LangSmith, or unchanged when tracing is off.
+
+    Imported here rather than at module scope: app.observability reaches back into
+    app.db, and mesh must stay importable by anything.
+    """
+    from app.observability import configure
+
+    if not configure()["langsmith"]:
+        return client
+    from langsmith.wrappers import wrap_openai
+
+    return wrap_openai(client)
+
+
 class MeshClient:
     def __init__(self) -> None:
         self._client: OpenAI | None = None
@@ -178,12 +193,18 @@ class MeshClient:
         if self._client is None:
             if not settings.meshapi_api_key:
                 raise MeshError("MESHAPI_API_KEY is not set")
-            self._client = OpenAI(
+            client = OpenAI(
                 base_url=settings.meshapi_base_url,
                 api_key=settings.meshapi_api_key,
                 timeout=settings.meshapi_timeout_seconds,
                 max_retries=0,  # we retry ourselves so the breaker sees each failure
             )
+            # Mesh traffic goes out through the raw OpenAI SDK, not a LangChain model, so
+            # LangSmith is blind to it: without this the graph trace is chain nodes with
+            # no prompts and no token counts under them. The wrapper nests each call
+            # inside whichever node is running. (Logfire sees the same calls via
+            # instrument_openai; this is the LangSmith half.)
+            self._client = _traced_client(client)
         return self._client
 
     @property

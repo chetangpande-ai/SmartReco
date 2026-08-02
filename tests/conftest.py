@@ -23,6 +23,11 @@ os.environ.update(
     SECRET_KEY="test-secret-key-not-for-production",
     APP_ENV="test",
     LOG_LEVEL="WARNING",
+    # Off even when .env has real credentials: a test run must not ship spans to
+    # someone's LangSmith project, and logfire's instrumentation is process-global.
+    # test_observability.py drives both against a stub instead.
+    LANGSMITH_TRACING="false",
+    LOGFIRE_ENABLED="false",
 )
 
 import pytest  # noqa: E402

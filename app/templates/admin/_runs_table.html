@@ -24,7 +24,7 @@
       <td>
         {% if r.status == 'ok' %}<span class="badge badge-good">ok</span>
         {% else %}<span class="badge badge-bad" title="{{ r.error[:200] }}">{{ r.status }}</span>{% endif %}
-        {% if r.langsmith_url %}<a class="small" href="{{ r.langsmith_url }}" rel="noopener">trace</a>{% endif %}
+        {% if r.langsmith_url %}<a class="small" href="{{ r.langsmith_url }}" target="_blank" rel="noopener">trace</a>{% endif %}
       </td>
     </tr>
   {% else %}

@@ -29,6 +29,118 @@ class TestNotifierSelection:
         assert not settings.has_smtp
         assert notify.get_notifier().backend == "file"
 
+    def test_smtp_selected_once_a_host_is_configured(self, monkeypatch):
+        monkeypatch.setattr(settings, "smtp_host", "smtp.example.com")
+        assert notify.get_notifier().backend == "smtp"
+
+
+class FakeSMTP:
+    """Stands in for smtplib.SMTP so the send path is exercised without a server.
+
+    The MIME structure is the part that actually breaks in production — a missing
+    text/plain alternative lands the mail in spam, and a wrong header set gets it
+    rejected outright. None of that is visible from the file sink.
+    """
+
+    instances: list["FakeSMTP"] = []
+
+    def __init__(self, host, port, timeout=None):
+        self.host, self.port, self.timeout = host, port, timeout
+        self.started_tls = False
+        self.login_args = None
+        self.sent = None
+        FakeSMTP.instances.append(self)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def starttls(self, context=None):
+        self.started_tls = True
+
+    def login(self, user, password):
+        self.login_args = (user, password)
+
+    def send_message(self, message):
+        self.sent = message
+
+
+class TestSmtpSend:
+    @pytest.fixture
+    def smtp(self, monkeypatch):
+        FakeSMTP.instances.clear()
+        monkeypatch.setattr(settings, "smtp_host", "smtp.example.com")
+        monkeypatch.setattr(settings, "smtp_port", 587)
+        monkeypatch.setattr(settings, "smtp_starttls", True)
+        monkeypatch.setattr(settings, "smtp_user", "mailer@example.com")
+        monkeypatch.setattr(settings, "smtp_password", "secret")
+        monkeypatch.setattr(settings, "mail_from", "SmartReco <no-reply@example.com>")
+        monkeypatch.setattr(notify.smtplib, "SMTP", FakeSMTP)
+        return FakeSMTP
+
+    def test_connects_to_the_configured_server(self, smtp):
+        notify.SmtpNotifier().send("shopper@example.com", "Subj", "<p>hi</p>", "hi")
+        conn = smtp.instances[-1]
+        assert (conn.host, conn.port) == ("smtp.example.com", 587)
+        assert conn.timeout == 30, "a hung SMTP server must not hang the scheduler"
+
+    def test_upgrades_to_tls_and_authenticates(self, smtp):
+        notify.SmtpNotifier().send("shopper@example.com", "Subj", "<p>hi</p>", "hi")
+        conn = smtp.instances[-1]
+        assert conn.started_tls
+        assert conn.login_args == ("mailer@example.com", "secret")
+
+    def test_skips_login_when_no_user_is_set(self, smtp, monkeypatch):
+        monkeypatch.setattr(settings, "smtp_user", "")
+        notify.SmtpNotifier().send("shopper@example.com", "Subj", "<p>hi</p>", "hi")
+        assert smtp.instances[-1].login_args is None
+
+    def test_skips_starttls_when_disabled(self, smtp, monkeypatch):
+        monkeypatch.setattr(settings, "smtp_starttls", False)
+        notify.SmtpNotifier().send("shopper@example.com", "Subj", "<p>hi</p>", "hi")
+        assert not smtp.instances[-1].started_tls
+
+    def test_message_is_multipart_alternative_with_both_bodies(self, smtp):
+        notify.SmtpNotifier().send(
+            "shopper@example.com", "Your picks", "<p>html body</p>", "text body"
+        )
+        message = smtp.instances[-1].sent
+        assert message["To"] == "shopper@example.com"
+        assert message["From"] == "SmartReco <no-reply@example.com>"
+        assert message["Subject"] == "Your picks"
+        assert message.get_content_type() == "multipart/alternative"
+
+        parts = {p.get_content_type(): p.get_content() for p in message.iter_parts()}
+        assert set(parts) == {"text/plain", "text/html"}
+        assert "text body" in parts["text/plain"]
+        assert "<p>html body</p>" in parts["text/html"]
+
+    def test_reports_where_it_delivered(self, smtp):
+        result = notify.SmtpNotifier().send("s@example.com", "S", "<p>h</p>", "t")
+        assert result == "smtp:smtp.example.com"
+
+    def test_a_dead_server_is_recorded_as_a_failed_notification(self, smtp, monkeypatch,
+                                                                catalog, user_factory):
+        class Refusing(FakeSMTP):
+            def send_message(self, message):
+                raise OSError("connection refused")
+
+        monkeypatch.setattr(notify.smtplib, "SMTP", Refusing)
+        uid = user_factory()
+        with session_scope() as db:
+            delivered = notify.send_once(
+                db, db.get(User, uid), dedupe_key="digest:smtp:down",
+                subject="s", html="<p>x</p>", text="x",
+            )
+        assert not delivered
+        with session_scope() as db:
+            note = db.scalar(
+                select(Notification).where(Notification.dedupe_key == "digest:smtp:down")
+            )
+            assert note.status == "failed" and "connection refused" in note.error
+
 
 class TestAudience:
     def test_active_user_included(self, catalog, user_factory, event_factory):

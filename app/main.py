@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app import metrics, scheduler
+from app import metrics, observability, scheduler
 from app.config import ROOT, settings
 from app.db import SessionLocal, init_db
 from app.deps import ANON_COOKIE, new_anon_id
@@ -45,12 +45,22 @@ async def lifespan(app: FastAPI):
     scheduler.start()
     log.info(
         "smartreco up",
-        extra={"env": settings.app_env, "llm": settings.has_llm, "model": settings.meshapi_model},
+        extra={
+            "env": settings.app_env,
+            "llm": settings.has_llm,
+            "model": settings.meshapi_model,
+            "tracing": observability.status(),
+        },
     )
     yield
     scheduler.shutdown()
     await ingestor.stop()
 
+
+# Before FastAPI exists, not inside lifespan: instrumentation patches libraries at the
+# class level, so anything constructed earlier keeps the unpatched version. It also has to
+# beat the first langsmith.Client — see app/observability.py for why that ordering matters.
+observability.configure()
 
 app = FastAPI(
     title="SmartReco",
@@ -58,6 +68,7 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+observability.instrument_app(app)
 
 app.mount("/static", StaticFiles(directory=str(ROOT / "app" / "static")), name="static")
 app.include_router(health.router)
