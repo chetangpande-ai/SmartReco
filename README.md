@@ -2,7 +2,7 @@
 
 **A behavioural AI recommendation agent for an online learning platform.**
 
-It watches how each learner actually behaves, reasons over that behaviour with a
+It watches  how each learner actually behaves, reasons over that behaviour with a
 LangGraph agent, retrieves matching courses from a vector database, and writes a
 persuasive recommendation that is *grounded in the real catalogue* and *checked for
 honesty* before anyone sees it.
