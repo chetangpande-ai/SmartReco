@@ -1,5 +1,7 @@
 """Embeddings cache, vector stores, and the transactional-outbox dual write."""
 
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
 from sqlalchemy import delete, func, select
@@ -124,6 +126,257 @@ class TestFilterTranslation:
     def test_both_return_none_for_an_empty_filter(self):
         assert ChromaStore._where(Filter()) is None
         assert PineconeStore._filter(Filter()) is None
+
+
+class FakeIndex:
+    """The subset of a Pinecone index this app touches, recording every call."""
+
+    def __init__(self):
+        self.upserts: list[dict] = []
+        self.deletes: list[dict] = []
+        self.queries: list[dict] = []
+        self.fetched: list[list[str]] = []
+        self.stored: dict[str, str] = {}  # id -> content_hash
+        self.namespace_exists = True
+        self.stats = {"total_vector_count": 12, "namespaces": {"tenant-a": {"vector_count": 5}}}
+
+    def upsert(self, vectors, namespace=None):
+        self.upserts.append({"vectors": vectors, "namespace": namespace})
+
+    def delete(self, ids=None, namespace=None, delete_all=False):
+        if delete_all and not self.namespace_exists:
+            raise RuntimeError("[404] Namespace not found")
+        self.deletes.append({"ids": ids, "namespace": namespace, "delete_all": delete_all})
+
+    def list(self, namespace=None):
+        """Yields ListResponse *objects*, exactly as the 9.x SDK does — not id strings.
+        Getting this shape wrong is what silently broke drift detection."""
+        ids = sorted(self.stored)
+        for start in range(0, len(ids), 3):  # several pages, so pagination is exercised
+            yield SimpleNamespace(
+                vectors=[SimpleNamespace(id=i) for i in ids[start : start + 3]]
+            )
+
+    def fetch(self, ids, namespace=None):
+        self.fetched.append(list(ids))
+        return SimpleNamespace(
+            vectors={
+                i: SimpleNamespace(metadata={"content_hash": self.stored[i], "title": "t"})
+                for i in ids
+                if i in self.stored
+            }
+        )
+
+    def query(self, vector, top_k, filter=None, include_metadata=False, namespace=None):
+        self.queries.append({"vector": vector, "top_k": top_k, "filter": filter,
+                             "namespace": namespace})
+        return {
+            "matches": [
+                {"id": "7", "score": 0.83,
+                 "metadata": {"title": "Sony WH-1000XM5", "document": "text that rides along",
+                              "content_hash": "abc"}},
+            ]
+        }
+
+    def describe_index_stats(self):
+        return _Stats(self.stats)
+
+
+class _Stats(dict):
+    """describe_index_stats returns an object with attribute access for namespaces and
+    mapping access for the totals. Model both, because the code uses both."""
+
+    @property
+    def namespaces(self):
+        return self["namespaces"]
+
+
+class FakePinecone:
+    def __init__(self, api_key=None):
+        self.api_key = api_key
+        self.created: list[dict] = []
+        self.index = FakeIndex()
+        self.existing: dict[str, int] = {}  # name -> dimension
+
+    def has_index(self, name):
+        return name in self.existing
+
+    def describe_index(self, name):
+        return SimpleNamespace(name=name, dimension=self.existing[name], metric="cosine")
+
+    def create_index(self, name, dimension, metric, spec):
+        self.created.append({"name": name, "dimension": dimension, "metric": metric,
+                             "spec": spec})
+        self.existing[name] = dimension
+
+    def Index(self, name):  # noqa: N802 — mirrors the SDK's own casing
+        return self.index
+
+    # The calls under test land on the index; surface them here so assertions read
+    # against one object.
+    upserts = property(lambda self: self.index.upserts)
+    deletes = property(lambda self: self.index.deletes)
+    queries = property(lambda self: self.index.queries)
+
+
+class TestPineconeBackend:
+    """Pinecone is a hosted service with no local mode, so these run against a stub of
+    the 9.x surface. That still catches what actually breaks on a backend swap — a wrong
+    call shape, a dropped namespace, an unchunked batch — none of which the filter
+    translation tests above would notice.
+    """
+
+    @pytest.fixture
+    def store(self, monkeypatch):
+        import pinecone
+
+        from app.config import settings
+
+        fake = FakePinecone()
+        monkeypatch.setattr(pinecone, "Pinecone", lambda api_key=None: fake)
+        monkeypatch.setattr(settings, "pinecone_api_key", "pc-test-key")
+        monkeypatch.setattr(settings, "pinecone_index", "smartreco")
+        monkeypatch.setattr(settings, "pinecone_namespace", "")
+
+        def build(namespace: str = "", exists: bool = False, existing_dim: int = 8):
+            monkeypatch.setattr(settings, "pinecone_namespace", namespace)
+            if exists:
+                fake.existing["smartreco"] = existing_dim
+            return PineconeStore("mesh:test:8", 8), fake
+
+        return build
+
+    def test_creates_a_serverless_index_when_missing(self, store):
+        _, fake = store()
+        assert fake.created and fake.created[0]["dimension"] == 8
+        assert fake.created[0]["metric"] == "cosine"
+
+    def test_reuses_an_existing_index(self, store):
+        _, fake = store(exists=True)
+        assert fake.created == []
+
+    def test_an_existing_index_of_the_wrong_dimension_is_refused_at_startup(self, store):
+        """Found on a real account: an index named `smartreco` already existed at 1024
+        dims against a 1536-dim embedder. Without this check `has_index` returns True,
+        creation is skipped, and every upsert fails later inside the outbox worker —
+        a retry loop that dead-letters the whole catalogue with a cryptic error.
+        """
+        with pytest.raises(RuntimeError, match="1024-dimensional"):
+            store(exists=True, existing_dim=1024)
+
+    def test_missing_api_key_fails_loudly(self, monkeypatch):
+        from app.config import settings
+
+        monkeypatch.setattr(settings, "pinecone_api_key", "")
+        with pytest.raises(RuntimeError, match="PINECONE_API_KEY"):
+            PineconeStore("mesh:test:8", 8)
+
+    def test_upserts_are_chunked_to_the_api_limit(self, store):
+        """Pinecone rejects batches over 100 vectors. A 250-product reindex arrives as
+        one call without this, and fails wholesale."""
+        s, fake = store(exists=True)
+        s.upsert([
+            VectorRecord(id=str(i), embedding=[0.1] * 8, document=f"doc {i}",
+                         metadata={"product_id": i})
+            for i in range(250)
+        ])
+        assert [len(c["vectors"]) for c in fake.upserts] == [100, 100, 50]
+
+    def test_document_rides_along_in_metadata(self, store):
+        """Pinecone has no document field, so the reranker would otherwise need a second
+        round trip to SQL for every hit."""
+        s, fake = store(exists=True)
+        s.upsert([VectorRecord(id="1", embedding=[0.1] * 8, document="x" * 5000,
+                               metadata={"product_id": 1})])
+        meta = fake.upserts[0]["vectors"][0]["metadata"]
+        assert meta["product_id"] == 1
+        assert len(meta["document"]) == 4000  # truncated, not rejected
+
+    def test_empty_upsert_makes_no_call(self, store):
+        s, fake = store(exists=True)
+        s.upsert([])
+        assert fake.upserts == []
+
+    def test_query_maps_matches_and_lifts_the_document_out(self, store):
+        s, fake = store(exists=True)
+        hits = s.query([0.2] * 8, 3, Filter(tiers=["flagship"]))
+        assert fake.queries[0]["top_k"] == 3
+        assert fake.queries[0]["filter"] == {"tier": {"$in": ["flagship"]}}
+        assert len(hits) == 1
+        assert hits[0].id == "7" and hits[0].score == pytest.approx(0.83)
+        assert hits[0].document == "text that rides along"
+        assert "document" not in hits[0].metadata and hits[0].metadata["title"]
+
+    def test_a_zero_k_query_never_reaches_the_network(self, store):
+        s, fake = store(exists=True)
+        assert s.query([0.2] * 8, 0) == []
+        assert fake.queries == []
+
+    def test_namespace_is_threaded_through_every_call(self, store):
+        s, fake = store(namespace="tenant-a", exists=True)
+        s.upsert([VectorRecord(id="1", embedding=[0.1] * 8, document="d", metadata={})])
+        s.delete(["1"])
+        s.query([0.1] * 8, 2)
+        s.reset()
+        assert fake.upserts[0]["namespace"] == "tenant-a"
+        assert fake.deletes[0]["namespace"] == "tenant-a"
+        assert fake.queries[0]["namespace"] == "tenant-a"
+        assert fake.deletes[-1]["delete_all"] is True
+
+    def test_empty_delete_makes_no_call(self, store):
+        s, fake = store(exists=True)
+        s.delete([])
+        assert fake.deletes == []
+
+    def test_count_reads_the_namespace_when_one_is_set(self, store):
+        s, _ = store(namespace="tenant-a", exists=True)
+        assert s.count() == 5
+
+    def test_count_reads_the_total_without_a_namespace(self, store):
+        s, _ = store(exists=True)
+        assert s.count() == 12
+
+    def test_health_matches_the_chroma_shape(self, store):
+        s, _ = store(exists=True)
+        health = s.health()
+        assert health["backend"] == "pinecone"
+        assert {"backend", "vectors", "embedder"} <= set(health)
+
+    def test_all_hashes_reads_ids_out_of_the_paginated_response(self, store):
+        """Caught live: `list()` paginates ListResponse objects, not id strings.
+        Iterating one directly fetched junk and returned {} — so reconcile saw every
+        product as `missing` and re-upserted the whole catalogue hourly, while `stale`
+        and `orphaned` could never be detected. A no-op that looked like a repair.
+        """
+        s, fake = store(exists=True)
+        fake.index.stored = {str(i): f"hash-{i}" for i in range(1, 8)}
+
+        hashes = s.all_hashes()
+        assert hashes == {str(i): f"hash-{i}" for i in range(1, 8)}
+        assert len(fake.index.fetched) == 3, "should follow every page"
+        assert all(isinstance(i, str) for page in fake.index.fetched for i in page)
+
+    def test_all_hashes_is_empty_on_an_empty_index(self, store):
+        s, _ = store(exists=True)
+        assert s.all_hashes() == {}
+
+    def test_reset_tolerates_a_namespace_that_does_not_exist_yet(self, store):
+        """A namespace springs into existence on first write, so delete_all against a
+        brand-new index raises 404. reindex_all() calls reset() first — so this failed
+        the very first thing a fresh Pinecone setup does."""
+        s, fake = store(exists=True)
+        fake.index.namespace_exists = False
+        s.reset()  # must not raise: the requested end state already holds
+
+    def test_reset_still_propagates_a_real_failure(self, store):
+        s, fake = store(exists=True)
+
+        def boom(**kwargs):
+            raise RuntimeError("[403] Forbidden")
+
+        fake.index.delete = boom
+        with pytest.raises(RuntimeError, match="Forbidden"):
+            s.reset()
 
 
 class TestVectorStore:

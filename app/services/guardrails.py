@@ -39,7 +39,9 @@ class GuardrailReport:
         self.violations.append(f"{rule}: {detail}")
 
 
-# Claims nobody selling a course can honestly make.
+# Claims this catalogue cannot support. The earnings/employment rails read as leftovers
+# from a different storefront, and they are — they stay because they cost one regex each
+# and a model writing persuasive copy will reach for whichever register it was trained on.
 _FORBIDDEN = [
     (r"\bguarantee(d|s)?\b", "outcome guarantee"),
     (r"\brisk[- ]free\b", "risk-free claim"),
@@ -71,6 +73,25 @@ _FABRICATED_URGENCY = [
     (r"\blast\s+chance\b", "pressure language"),
 ]
 
+# Facts a *store* invites a model to invent, which is a different set from the ones a
+# course would. The catalogue has a title, brand, category, tier, price, rating, tags and
+# a spec line — no stock level, no shipping, no warranty, no price history. Every claim
+# below is therefore unsupported by construction, and all of them are things a model
+# writing shop copy reaches for unprompted.
+_UNSUPPORTED_COMMERCE = [
+    (r"\b(in|back)\s+stock\b", "stock claim"),
+    (r"\b(only\s+)?\d+\s+left\s+in\s+stock\b", "stock claim"),
+    (r"\bwhile\s+(stocks?|supplies)\s+last\b", "stock claim"),
+    (r"\bships?\s+(today|tomorrow|free|within)\b", "shipping claim"),
+    (r"\bfree\s+(shipping|delivery|returns?)\b", "shipping claim"),
+    (r"\bnext[- ]day\s+delivery\b", "shipping claim"),
+    (r"\b\d+[- ]year\s+warranty\b", "warranty claim"),
+    (r"\b(lowest|best)\s+price\s+(ever|of\s+the\s+year|anywhere|guaranteed)\b", "price claim"),
+    (r"\bprice\s+(drop|cut|match)\b", "price claim"),
+    (r"\bcheapest\b", "price claim"),
+    (r"\bon\s+sale\b", "price claim"),
+]
+
 _DISCOUNT = re.compile(r"\b(\d{1,2})%\s*(off|discount)|\bsave\s+\$?\d+|\bhalf[- ]price\b", re.I)
 _PRICE = re.compile(r"\$\s?(\d[\d,]*)(?:\.(\d{2}))?")
 _EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
@@ -96,6 +117,11 @@ def check_copy(
         match = re.search(pattern, lowered)
         if match:
             report.add("fabricated_urgency", f"{label} ({match.group(0)!r})")
+
+    for pattern, label in _UNSUPPORTED_COMMERCE:
+        match = re.search(pattern, lowered)
+        if match:
+            report.add("unsupported_commerce", f"{label} ({match.group(0)!r})")
 
     if _DISCOUNT.search(text):
         # There is no discount field in the catalogue, so any discount is invented.

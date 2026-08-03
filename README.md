@@ -105,7 +105,7 @@ A naive `db.commit(); chroma.upsert()` has a window where SQL committed and the 
 write failed, and **nothing remembers it needs fixing**. Here the *intent to sync* is
 committed with the data, so an outage is a delay rather than permanent divergence.
 
-Three drift classes are tested by injecting each fault:
+Three drift classes are tested by injecting each fault — **on both backends, live**:
 
 | Injected | Detected | Repaired |
 |---|---|---|
@@ -130,15 +130,28 @@ enqueues a delete rather than setting a flag retrieval must remember to filter o
   after the page is gone, which is exactly when dwell time is finally known
 - `requestIdleCallback(fn, {timeout: 500})` — the timeout is mandatory, a backgrounded
   tab defers an untimed callback indefinitely
-- `localStorage` spill-over retries a failed batch on the next page load
+- `localStorage` spill-over retries a failed batch on the next page load, **including
+  when the server answered 429 or 500** — `fetch` resolves on those, so a `.catch()`-only
+  handler drops exactly the batches worth keeping
+- Flushes are chunked to the server's per-batch cap, so a stash drain after an outage
+  cannot arrive as one oversized 422
 - Every event carries a client-generated idempotency key, so retries are free
 
-**Measured in a browser:** **50 events accepted in 10 ms**; unload flush lands in
-0.32 s; three identical replays → `persisted: 6, duplicates: 2` from a batch of 8.
+**Measured against the running server** (25 requests per row, end to end):
+
+| batch | p50 | p95 | max |
+|---|---|---|---|
+| 1 event | 2.7 ms | 4.1 ms | 6.4 ms |
+| 10 events (one page's worth) | 3.0 ms | 4.4 ms | 21.2 ms |
+| a product page render, for scale | 5.5 ms | 13.6 ms | — |
+
+The beacon costs less than rendering the page it is reporting on. Three identical
+replays → `persisted: 6, duplicates: 2` from a batch of 8.
 
 The server validates **per event**, not per batch — a retired event type from a
 `tracker.js` still in someone's browser cache rejects that one event, not the 99 good
-ones alongside it.
+ones alongside it. The rate limiter charges per event and is sized from that: a
+25-page session at ~10 events a page never trips it, an 800-event burst does.
 
 ### 4. The agentic recommendation engine
 
@@ -181,6 +194,25 @@ filters accordingly — the same progression logic that makes the copy able to s
 *"you've been looking at the top of this category"* rather than just *"here's something
 similar"*.
 
+**Is it actually personalised, or a popular list with better prose?** Three shoppers,
+same catalogue, different histories, run against the live gateway:
+
+| | picks shared with the popularity baseline | with each other |
+|---|---|---|
+| browsed cameras, searched *"mirrorless camera for travel"* | 1 / 4 | — |
+| browsed gaming + TVs, searched *"4k 120hz gaming tv"* | 0 / 4 | 0 / 4 |
+| browsed wearables, searched *"running watch with gps"* | 0 / 4 | 0 / 4 |
+
+No two shoppers were shown the same product. The copy tracks the behaviour too, citing
+what they actually did:
+
+> **You've shown a strong interest in the Oura Ring Gen 4 Silver and Garmin Forerunner
+> 265 Music while searching for a sleep tracking ring and running watch with GPS.**
+
+The camera shopper's run also exercised the refine loop for real —
+`analyze → plan → retrieve → grade → refine → retrieve → grade → generate → verify →
+finalize`, $0.000676.
+
 ### 5. Efficiency and production thinking
 
 A recommendation costs a model call only if **every** gate passes:
@@ -217,10 +249,10 @@ token-bucket rate limiting; CSP and security headers.
 |---|---|
 | ⭐ **Structured agent framework** | LangGraph 1.2, 8 nodes, conditional edges, bounded refine + repair loops. `/admin` renders the graph **read from the compiled object**, so it cannot drift from what runs |
 | ⭐ **Scheduled proactive delivery** | APScheduler: digest at 16:00 UTC (with jitter), outbox drain 60 s, reconcile hourly. Idempotent via a unique `digest:<user>:<date>` key |
-| ⭐ **Observability** | **LangSmith** traces the graph (with the Mesh calls nested inside it as real `llm` runs), **Logfire** traces the request around it, and one run reaches both through LangSmith's OTel bridge. Plus a durable `agent_runs` table: node path, grade, refines, tokens, cost, latency, trace URL. [Details ↓](#observability-two-views-one-run) |
+| ⭐ **Observability** | **LangSmith** traces the graph (with the Mesh calls nested inside as real `llm` runs), **Logfire** traces the request around it — HTTP, SQL, tokens — and one run reaches both through LangSmith's OTel bridge. **Both live, not just wired.** Plus a durable `agent_runs` table: node path, grade, refines, tokens, cost, latency, trace URL. [Details ↓](#observability-two-views-one-run) |
 | ⭐ **Retrieval polish** | Hybrid vector+BM25 → RRF → metadata filters → MMR → LLM re-rank. Relevance floor **tuned by sweep, not guessed** |
 | ➕ **Guardrails** | Deterministic rails always on (free, offline); NeMo Guardrails as an opt-in second layer, routed through Mesh |
-| ➕ **Two vector backends** | Chroma (default) and Pinecone behind one protocol |
+| ➕ **Two vector backends** | Chroma (default) and Pinecone behind one 7-method protocol. **Both verified against live indexes** — identical recall on the same 20 probes, one env var apart |
 | ➕ **Offline eval harness** | 20 paraphrase probes, recall@k + MRR, `make eval` |
 
 ---
@@ -291,6 +323,23 @@ happily recite specifications from training data that may be wrong or years stal
 generation prompt therefore states that catalogue facts are the *only* facts it may
 use, and the `spec` field exists so there is always something accurate to quote.
 
+**A store invites a different set of inventions than a course does.** The catalogue has
+a title, brand, category, tier, price, rating, tags and a spec line — no stock level, no
+shipping, no warranty, no price history. So "in stock", "ships today", "free delivery",
+"3-year warranty", "lowest price ever", "on sale" are all unsupported *by construction*,
+and all of them are phrases a model reaches for unprompted when told to sell. Eleven
+rails cover them, alongside a test that ordinary persuasive copy still passes — an
+over-broad rail that blocks honest writing is the same bug in the other direction.
+
+### Recommending fewer than four
+
+Retrieval always returns a full slate, so a narrow interest — the catalogue holds three
+wearables — gets padded with whatever fused in behind them. An A/B run caught it live: a
+fitness shopper's fourth pick was a video doorbell, reasoned as "in case you're looking
+for more tech at home". Honest, grounded, and exactly what makes a recommender feel
+generic. The generation prompt now asks for *up to* `REC_TOP_K` and says plainly that
+three products someone would consider beats four with a filler in it.
+
 ### Observability: two views, one run
 
 Two backends, because they answer different questions and neither is complete alone.
@@ -301,8 +350,9 @@ HTTP span, the SQL underneath it, the Mesh call and its token count, on one time
 They are joined rather than duplicated. Setting `LANGSMITH_TRACING_MODE=hybrid` makes
 the LangSmith SDK write each run to LangSmith *and* emit it as an OpenTelemetry span,
 which Logfire receives because Logfire owns the global tracer provider. One run, two
-places. Verified against the live project — the whole graph arrives, refine loops,
-guardrail repair and all:
+places — **both verified live against real projects**, with the LangSmith SDK confirmed
+to be writing into `logfire._internal.tracer._ProxyTracer` rather than one of its own.
+The whole graph arrives, refine loops, guardrail repair and all:
 
 ```
 smartreco.recommend                                          $0.000601
@@ -345,7 +395,7 @@ without reading logs — the question you ask once the demo is already running.
 ## Testing
 
 ```bash
-make test     # 269 tests, offline, no API key, spends nothing
+make test     # 309 tests, offline, no API key, spends nothing
 make cov      # coverage report (83%)
 make eval     # retrieval quality against 20 paraphrase probes
 ```
@@ -406,21 +456,39 @@ suite does not need it.
 
 ## Honest limitations
 
-- **Pinecone is implemented but untested.** No API key was available. The filter
-  translation and call shapes are written against the 9.1 signatures and unit-tested,
-  but I have not run it against a live index. Chroma is fully exercised.
-- **SMTP has never talked to a real mail server.** No credentials were available, so
-  every run has used the file sink. The send path *is* covered against a stubbed
-  `smtplib.SMTP` — connection parameters, STARTTLS, login, and the multipart/alternative
-  structure with both text and HTML bodies — which catches the failures that actually
-  happen (missing plain-text part, wrong headers). What remains unproven is whether a
-  given provider accepts the mail. `SesNotifier` is likewise written but unexercised.
-- **Logfire is wired but has never shipped to the cloud.** No token was available. The
-  configuration, instrumentation and the LangSmith→OTel bridge are proven — the bridge
-  by inspecting which tracer LangSmith ends up holding, and by watching a real span come
-  out of the console exporter — but `logfire.pydantic.dev` has not received a trace from
-  this app. LangSmith, by contrast, is verified live: the full ten-node graph arrives in
-  the `smartreco` project.
+**Two integrations have never touched their real service**, because both need a
+third-party account. Each is covered against a stub of the vendor's API — which pins the
+request shape, and proves nothing about whether the vendor accepts it. That distinction
+is the point of this section, and Pinecone below is why it matters.
+
+- **SES.** Needs an AWS account, a verified sender identity, and — in the sandbox — a
+  verified recipient too. `boto3` also sits in the optional `aws` extra, so it is not
+  installed by default; that now raises a message naming the fix rather than a bare
+  `ModuleNotFoundError` inside a 16:00 cron job. Five tests pin the `send_email` request
+  shape, which is what SES rejects.
+- **SMTP.** No credentials, so every run has used the file sink. Eight tests cover the
+  send path against a stubbed `smtplib.SMTP` — connection parameters, the 30s timeout,
+  STARTTLS, login, and the `multipart/alternative` structure with both bodies, which
+  catches the failures that actually happen (missing plain-text part, wrong headers).
+  Unproven: whether a given provider accepts the mail.
+
+**Pinecone used to be on that list.** It was covered by sixteen stub tests and looked
+fine. Running it against a live serverless index found **three bugs in under an hour**,
+and the stubs had agreed with every one of them:
+
+| Bug | Why the stub missed it | Symptom in production |
+|---|---|---|
+| An existing index of the wrong dimension was reused | The stub only ever created a fresh index | Every upsert fails inside the outbox worker, minutes later, dead-lettering the catalogue |
+| `reset()` 404s on a namespace that does not exist yet | The stub's `delete` never raised | `reindex_all()` — the *first* thing a new setup runs — crashes |
+| `all_hashes()` iterated `list()` as if it yielded id strings | The stub returned what the code expected, not what the SDK returns | Returned `{}`, so reconcile saw all 35 products as `missing` and re-upserted hourly forever, while `stale` and `orphaned` could never be detected — a no-op that looked like a repair |
+
+All three are fixed, each with a regression test whose stub now models the *real* shape.
+Verified live afterwards: 35 vectors indexed from the embedding cache for **$0**, the
+20-probe eval identical to Chroma, drift injected and repaired at exactly 1 vector rather
+than 35, and a full agent run at $0.000492.
+
+Chroma remains the committed default, so `git clone && make seed && make run` still needs
+no signup — but the production path is now a path someone has actually walked.
 - **APScheduler assumes one process.** The jobs are individually safe to run
   concurrently (the outbox coalesces, reconcile is a diff, the digest has a unique
   key), so scaling out means changing the scheduler, not the jobs.

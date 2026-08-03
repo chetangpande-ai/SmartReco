@@ -458,7 +458,10 @@ def _deterministic_copy(state: AgentState, candidates: list[dict]) -> dict:
     # profile.evidence() phrases every fact as a bare predicate ("searched for 'x'
     # 3 times", "spent 4m reading 'y'"), so "You " + fact is always a sentence.
     subject = next((m.group(1) for f in facts if (m := _QUOTED.search(f))), "")
-    category = next(iter(state.get("filters", {}).get("categories") or []), "")
+    # Category comes off the retrieved set, not the filters: `analyze` deliberately does
+    # not filter by category — soft matching beats a hard fence for discovery — so
+    # reading it from there always produced an empty string.
+    category = (top[0]["category"] if top else "").replace("-", " ")
     headline = (
         f"More like {subject}"[:70] if subject
         else (f"Picked from {category}"[:70] if category else "Picked for you")

@@ -9,8 +9,8 @@ Three ideas do the work:
     in one number you can tune.
 
   * **Intent weighting.** Not all events mean the same thing. A search is someone
-    telling you what they want; a page view is them wandering past. Enrolling is worth
-    twenty page views. The weights below encode that ordering.
+    telling you what they want; a page view is them wandering past. A purchase is worth
+    thirty page views. The weights below encode that ordering.
 
   * **An interest centroid.** A single vector summarising what the user engages with,
     built from the same embedding space as the catalogue. It is what makes "have this
@@ -34,8 +34,8 @@ from app.services.retrieval import tokenize
 
 log = logging.getLogger(__name__)
 
-# Relative worth of each signal. Explicit intent (search, enrol) beats passive
-# exposure (page_view, impression) by design.
+# Relative worth of each signal. Explicit intent (search, basket, purchase) beats
+# passive exposure (page_view, impression) by design.
 EVENT_WEIGHTS = {
     "purchase": 5.0,
     "add_to_cart": 3.0,

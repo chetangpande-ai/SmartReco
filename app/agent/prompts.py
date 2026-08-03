@@ -110,7 +110,13 @@ def generate_user_prompt(
             lines.append(f"    {c['description'][:200]}")
     lines += [
         "",
-        f"Choose the {top_k} best and write the recommendation.",
+        f"Choose up to {top_k} and write the recommendation.",
+        # Retrieval always returns a full slate, so a narrow interest with only two or
+        # three real matches gets padded with whatever fused in behind them. Padding is
+        # what makes a recommender feel generic, so say plainly that a short list is the
+        # better answer.
+        "Return FEWER than that if the rest do not genuinely fit what this shopper has",
+        "been doing. Three products they would actually consider beats four with a filler.",
         "Order picks best-first. Each reason must say something true and specific about",
         "why THIS shopper should look at THAT product next.",
     ]

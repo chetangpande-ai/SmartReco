@@ -68,7 +68,16 @@ class SesNotifier:
     backend = "ses"
 
     def send(self, to: str, subject: str, html: str, text: str) -> str:
-        import boto3
+        try:
+            import boto3
+        except ImportError as exc:
+            # boto3 lives in the optional `aws` extra, so MAIL_BACKEND=ses on a default
+            # install fails inside a scheduled job at 16:00 with a bare ModuleNotFound.
+            # Say what to do instead.
+            raise RuntimeError(
+                "MAIL_BACKEND=ses needs boto3: install the aws extra "
+                "(`uv sync --extra aws`), or set MAIL_BACKEND=smtp"
+            ) from exc
 
         client = boto3.client("ses", region_name=settings.aws_region)
         client.send_email(

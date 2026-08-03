@@ -1,5 +1,7 @@
 """Digest rendering, once-only delivery, and the scheduler."""
 
+import sys
+
 import pytest
 from markupsafe import escape
 from sqlalchemy import func, select
@@ -140,6 +142,65 @@ class TestSmtpSend:
                 select(Notification).where(Notification.dedupe_key == "digest:smtp:down")
             )
             assert note.status == "failed" and "connection refused" in note.error
+
+
+class FakeSes:
+    """The one boto3 call this app makes. Records the request so its shape is checked
+    without an AWS account — SES rejects a malformed Message body outright."""
+
+    def __init__(self):
+        self.region = None
+        self.sent: dict | None = None
+
+    def client(self, service, region_name=None):
+        assert service == "ses"
+        self.region = region_name
+        return self
+
+    def send_email(self, **kwargs):
+        self.sent = kwargs
+        return {"MessageId": "0100018f-test"}
+
+
+class TestSesSend:
+    """SES needs an AWS account, a verified sender identity, and — in the sandbox — a
+    verified recipient too, so this has never run against the real service. What a stub
+    still proves is the request shape, which is what SES rejects.
+    """
+
+    @pytest.fixture
+    def ses(self, monkeypatch):
+        fake = FakeSes()
+        monkeypatch.setitem(sys.modules, "boto3", fake)
+        monkeypatch.setattr(settings, "aws_region", "eu-west-1")
+        monkeypatch.setattr(settings, "mail_from", "SmartReco <no-reply@example.com>")
+        return fake
+
+    def test_selected_by_configuration(self, monkeypatch):
+        monkeypatch.setattr(settings, "mail_backend", "ses")
+        assert notify.get_notifier().backend == "ses"
+
+    def test_uses_the_configured_region(self, ses):
+        notify.SesNotifier().send("shopper@example.com", "Subj", "<p>hi</p>", "hi")
+        assert ses.region == "eu-west-1"
+
+    def test_sends_both_bodies_in_the_shape_ses_expects(self, ses):
+        notify.SesNotifier().send("shopper@example.com", "Your picks", "<p>html</p>", "text")
+        assert ses.sent["Source"] == "SmartReco <no-reply@example.com>"
+        assert ses.sent["Destination"] == {"ToAddresses": ["shopper@example.com"]}
+        assert ses.sent["Message"]["Subject"]["Data"] == "Your picks"
+        assert ses.sent["Message"]["Body"]["Text"]["Data"] == "text"
+        assert ses.sent["Message"]["Body"]["Html"]["Data"] == "<p>html</p>"
+
+    def test_reports_where_it_delivered(self, ses):
+        assert notify.SesNotifier().send("s@example.com", "S", "<p>h</p>", "t") == "ses"
+
+    def test_a_missing_boto3_says_what_to_install(self, monkeypatch):
+        """boto3 is in the optional `aws` extra. Without this, MAIL_BACKEND=ses on a
+        default install dies inside a 16:00 cron job with a bare ModuleNotFoundError."""
+        monkeypatch.setitem(sys.modules, "boto3", None)
+        with pytest.raises(RuntimeError, match="uv sync --extra aws"):
+            notify.SesNotifier().send("s@example.com", "S", "<p>h</p>", "t")
 
 
 class TestAudience:

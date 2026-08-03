@@ -69,11 +69,7 @@
     }
   }
 
-  function flush(useBeacon) {
-    if (timer) { clearTimeout(timer); timer = null; }
-    if (!queue.length) return;
-
-    var batch = queue.splice(0, queue.length);
+  function send(batch, useBeacon) {
     var body = JSON.stringify({ events: batch });
 
     if (useBeacon && navigator.sendBeacon) {
@@ -91,10 +87,27 @@
         body: body,
         keepalive: true,
         credentials: "same-origin",
+      }).then(function (res) {
+        // fetch only rejects on a *network* failure. A 429 or a 500 resolves normally,
+        // so without this check the retry stash never engages for the failures that
+        // actually happen and the batch is dropped in silence. 400/422 are the
+        // exception: a malformed batch will be malformed again next time.
+        if (!res.ok && res.status !== 400 && res.status !== 422) stash(batch);
       }).catch(function () {
         stash(batch); // retried on the next page load; idem keys make that safe
       });
     });
+  }
+
+  function flush(useBeacon) {
+    if (timer) { clearTimeout(timer); timer = null; }
+    if (!queue.length) return;
+
+    // Chunked, because the server caps a batch at 100 events. The normal queue never
+    // reaches that, but a stash drain after an offline spell holds up to MAX_STORED —
+    // and one oversized POST is a 422 that takes every event in it down with it.
+    var pending = queue.splice(0, queue.length);
+    while (pending.length) send(pending.splice(0, MAX_BATCH), useBeacon);
   }
 
   function stash(batch) {
@@ -191,7 +204,7 @@
         product_slug: body.dataset.productSlug,
         meta: {
           category: body.dataset.productCategory || "",
-          level: body.dataset.productLevel || "",
+          tier: body.dataset.productTier || "",
         },
       });
     } else {

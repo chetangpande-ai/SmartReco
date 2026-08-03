@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from app import metrics
+from app.ratelimit import TokenBucket
 from app.security import (
     create_session_token,
     csrf_ok,
@@ -139,6 +140,28 @@ class TestGuardrails:
     def test_blocks_invented_discounts(self, text):
         assert not guardrails.check_copy(text).ok
 
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "In stock and ready to go",
+            "Only 2 left in stock",
+            "Grab one while stocks last",
+            "Ships today if you order now",
+            "Comes with free shipping",
+            "Next-day delivery included",
+            "Backed by a 3-year warranty",
+            "The lowest price ever on this model",
+            "A recent price drop makes it worth a look",
+            "The cheapest way into full-frame",
+            "It's on sale right now",
+        ],
+    )
+    def test_blocks_commerce_claims_the_catalogue_cannot_support(self, text):
+        """A store has no stock, shipping, warranty or price-history fields — so every
+        one of these is invented, and every one is something a model reaches for
+        unprompted when asked to sell."""
+        assert not guardrails.check_copy(text).ok
+
     def test_price_must_match_catalogue(self):
         allowed = {8900, 7900}
         assert not guardrails.check_copy("Yours for $499", allowed_prices_cents=allowed).ok
@@ -152,30 +175,72 @@ class TestGuardrails:
         assert not guardrails.check_copy("x" * 1300).ok
 
     def test_honest_copy_passes(self):
+        """Real generated copy, to prove the rails above are not so broad that ordinary
+        persuasion trips them. Specificity is what sells here, not adjectives."""
         good = (
-            "You've been digging into agentic AI and spent real time on the RAG material. "
-            "These two advanced courses pick up exactly where that left off."
+            "You've been comparing noise-cancelling headphones and spent four minutes on "
+            "the Sony WH-1000XM5. The Bose QuietComfort Ultra is the other end of that "
+            "comparison, with 24h battery and a head-tracked spatial mode."
         )
         assert guardrails.check_copy(good).ok
 
     def test_scrub_keeps_honest_sentences(self):
         mixed = (
-            "You've been exploring agentic AI. "
-            "Only 2 seats remain so act now. "
-            "The LangGraph course builds on that."
+            "You've been comparing noise-cancelling headphones. "
+            "Only 2 left in stock so act now. "
+            "The Bose QuietComfort Ultra sits at the other end of that comparison."
         )
         cleaned = guardrails.scrub(mixed)
-        assert "seats" not in cleaned and "act now" not in cleaned
-        assert "agentic AI" in cleaned and "LangGraph" in cleaned
+        assert "stock" not in cleaned and "act now" not in cleaned
+        assert "noise-cancelling" in cleaned and "Bose" in cleaned
 
     def test_validate_reports_every_violation(self):
         report = guardrails.validate("Guaranteed job. Only 2 seats left. 50% off.")
         assert len(report.violations) >= 3
 
 
+class TestEventRateLimit:
+    """Sized against the production limiter, because the cost is one token per *event*
+    and a single page view is worth about ten of them."""
+
+    PAGE = 10  # product_view + 4 scroll marks + 4 impressions + dwell
+
+    def test_a_long_engaged_session_is_never_throttled(self):
+        """At the original capacity=60/refill=1 this failed on page 7, then held the
+        shopper to one event a second — telemetry loss dressed as abuse control, and it
+        hit hardest the users whose profiles are most worth building."""
+        from app.ratelimit import events_limiter as limiter
+
+        bucket = TokenBucket(limiter.capacity, limiter.refill_per_second)
+        for page in range(25):
+            assert bucket.allow("shopper", cost=self.PAGE), f"throttled on page {page + 1}"
+
+    def test_absorbs_a_full_offline_stash_in_one_go(self):
+        """tracker.js keeps up to MAX_STORED=200 events through an outage and drains
+        them on the next load. Rejecting that drain would lose the whole outage."""
+        from app.ratelimit import events_limiter as limiter
+
+        bucket = TokenBucket(limiter.capacity, limiter.refill_per_second)
+        assert bucket.allow("shopper", cost=200)
+
+    def test_a_runaway_loop_is_still_stopped(self):
+        from app.ratelimit import events_limiter as limiter
+
+        bucket = TokenBucket(limiter.capacity, limiter.refill_per_second)
+        allowed = sum(1 for _ in range(200) if bucket.allow("flood", cost=100))
+        assert allowed < 10, "a 20,000-event burst must not sail through"
+
+
 class TestTokenizer:
     def test_drops_stopwords(self):
-        assert tokenize("the best course for learning ai") == ["ai"]
+        assert tokenize("the best cheap price for buying headphones") == ["headphones"]
+
+    def test_keeps_the_words_that_actually_discriminate(self):
+        """Over-stopwording is the failure mode that matters: strip 'wireless' or
+        'noise' and the lexical half of the hybrid search stops contributing."""
+        assert set(tokenize("best cheap wireless noise cancelling headphones under 200")) == {
+            "wireless", "noise", "cancelling", "headphones", "200",
+        }
 
     def test_keeps_technical_terms(self):
         assert set(tokenize("c++ k8s node.js")) >= {"c++", "k8s"}

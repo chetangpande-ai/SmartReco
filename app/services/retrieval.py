@@ -34,9 +34,13 @@ from app.services.vectorstore import Filter, get_vector_store
 log = logging.getLogger(__name__)
 
 _TOKEN = re.compile(r"[a-z0-9][a-z0-9+#.-]*")
+# Words that carry no discriminating power in a shopping query. The shape of this list
+# is domain-specific: a shopper types "best cheap wireless headphones under 200", and
+# every word except "wireless" and "headphones" matches nothing in the catalogue text
+# while inflating document length in the BM25 denominator.
 STOPWORDS = frozenset(
     "the a an and or for with to of in on at is are be as by from it this that how "
-    "what best top course courses learn learning tutorial guide intro introduction "
+    "what best top good great cheap buy buying price review reviews vs versus under "
     "using your you my me i".split()
 )
 

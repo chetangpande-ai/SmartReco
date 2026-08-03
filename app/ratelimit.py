@@ -36,8 +36,14 @@ class TokenBucket:
             return len(stale)
 
 
-# Generous: a real browsing session produces a few batched calls per minute, so this
-# only bites on a runaway loop or an attempt to flood the events table.
-events_limiter = TokenBucket(capacity=60, refill_per_second=1.0)
+# Sized against real traffic, because the cost here is one token per *event*, not per
+# request, and a single page view is worth about ten of them (product_view, four scroll
+# marks, four impressions, a dwell). At capacity=60/refill=1 an engaged shopper — the one
+# whose profile is most worth building — was throttled after six pages and then held to
+# one event a second. That is a data-loss bug wearing an abuse-control costume.
+#
+# 300 absorbs a full localStorage stash drain (MAX_STORED=200) in one go; 10/s sustained
+# is still a hard ceiling a runaway loop hits immediately.
+events_limiter = TokenBucket(capacity=300, refill_per_second=10.0)
 auth_limiter = TokenBucket(capacity=10, refill_per_second=0.2)
 recommend_limiter = TokenBucket(capacity=10, refill_per_second=0.1)

@@ -208,6 +208,18 @@ class PineconeStore:
                     cloud=settings.pinecone_cloud, region=settings.pinecone_region
                 ),
             )
+        else:
+            # An index's dimension is fixed at creation. Reusing one that does not match
+            # the embedder fails on every upsert instead — inside the outbox worker,
+            # minutes later, as a retry loop that dead-letters the whole catalogue. Chroma
+            # catches the equivalent as `stale_embedder`; this is the same check.
+            existing = self._pc.describe_index(name).dimension
+            if existing != dim:
+                raise RuntimeError(
+                    f"pinecone index {name!r} is {existing}-dimensional but "
+                    f"{embedder_id} produces {dim}. Point PINECONE_INDEX at a "
+                    f"{dim}-dimensional index, or delete this one and let it be recreated."
+                )
         self._index = self._pc.Index(name)
         self._namespace = settings.pinecone_namespace
 
@@ -271,9 +283,20 @@ class PineconeStore:
         return f
 
     def all_hashes(self) -> dict[str, str]:
+        """Content hash per vector id — the whole basis of drift detection.
+
+        `list()` paginates `ListResponse` objects, not id strings; iterating one directly
+        yields nothing useful, so `fetch` was called with junk and this returned {}.
+        Reconcile then read every product as `missing` and re-upserted the entire
+        catalogue hourly, while `stale` and `orphaned` could never be detected at all —
+        a silent no-op that looked like a working repair.
+        """
         out: dict[str, str] = {}
-        for ids in self._index.list(namespace=self._namespace):
-            fetched = self._index.fetch(ids=list(ids), namespace=self._namespace)
+        for page in self._index.list(namespace=self._namespace):
+            ids = [item.id for item in page.vectors]
+            if not ids:
+                continue
+            fetched = self._index.fetch(ids=ids, namespace=self._namespace)
             for vid, vec in fetched.vectors.items():
                 out[vid] = (vec.metadata or {}).get("content_hash", "")
         return out
@@ -285,7 +308,16 @@ class PineconeStore:
         return int(stats.get("total_vector_count", 0))
 
     def reset(self) -> None:
-        self._index.delete(delete_all=True, namespace=self._namespace)
+        try:
+            self._index.delete(delete_all=True, namespace=self._namespace)
+        except Exception as exc:
+            # A namespace springs into existence on first write, so delete_all against a
+            # brand-new index raises 404 "Namespace not found". The requested end state —
+            # nothing in there — already holds, and this is the *first* thing a fresh
+            # Pinecone setup does, so failing here fails onboarding.
+            if "not found" not in str(exc).lower():
+                raise
+            log.debug("pinecone reset: nothing to clear", extra={"ns": self._namespace or "-"})
 
     def health(self) -> dict:
         return {

@@ -191,6 +191,37 @@ class TestEventIngest:
         )
         assert response.status_code == 422
 
+    def test_the_client_never_sends_a_batch_the_server_will_reject(self):
+        """tracker.js chunks to MAX_BATCH before sending. If that ever exceeds the
+        server's cap, a stash drain becomes a 422 — and fetch() does not reject on a 422,
+        so the client discards the whole batch instead of retrying it. Read from the
+        source so the two numbers cannot drift apart unnoticed.
+        """
+        import re
+
+        from annotated_types import MaxLen
+
+        from app.config import ROOT
+        from app.schemas import EventBatchIn
+
+        source = (ROOT / "app" / "static" / "js" / "tracker.js").read_text(encoding="utf-8")
+        client_batch = int(re.search(r"MAX_BATCH\s*=\s*(\d+)", source).group(1))
+        server_cap = next(
+            m.max_length
+            for m in EventBatchIn.model_fields["events"].metadata
+            if isinstance(m, MaxLen)
+        )
+        assert client_batch <= server_cap
+
+    def test_the_client_retries_on_a_rejected_response_not_only_a_dead_network(self):
+        """fetch() resolves on 429 and 500 — only a network failure rejects it. A
+        `.catch()`-only handler therefore drops exactly the batches worth retrying."""
+        from app.config import ROOT
+
+        source = (ROOT / "app" / "static" / "js" / "tracker.js").read_text(encoding="utf-8")
+        assert "res.ok" in source, "tracker.js must inspect the response status"
+        assert source.count("stash(batch)") >= 3  # beacon, bad status, network failure
+
     def test_empty_batch_is_rejected(self, client):
         assert client.post("/api/events/batch", json={"events": []}).status_code == 422
 
