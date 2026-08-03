@@ -17,6 +17,11 @@ EVENT_TYPES = frozenset(
         "filter",
         "dwell",
         "scroll_depth",
+        "enroll",
+        "wishlist",
+        # Retired names for enroll/wishlist. Kept accepted rather than rejected: a
+        # tracker.js sitting in someone's browser cache goes on sending them for days,
+        # and profile.EVENT_WEIGHTS still scores them identically.
         "add_to_cart",
         "purchase",
         "rec_impression",
@@ -72,14 +77,16 @@ class EventBatchAccepted(BaseModel):
     queued: bool = True
 
 
-TIERS = ("entry", "mid", "flagship")
+# The learner's level. Ordered, because the agent reasons about progression: someone
+# consistently opening advanced material is not shopping the introductory shelf.
+TIERS = ("beginner", "intermediate", "advanced")
 
 
 class ProductIn(BaseModel):
     title: str = Field(min_length=3, max_length=200)
     description: str = Field(default="", max_length=8000)
     category: str = Field(min_length=2, max_length=80)
-    tier: str = Field(default="entry")
+    tier: str = Field(default="beginner")
     tags: list[str] = Field(default_factory=list)
     price_cents: int = Field(default=0, ge=0, le=1_000_000_00)
     brand: str = Field(default="", max_length=120)

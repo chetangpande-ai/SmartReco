@@ -14,7 +14,7 @@
     {{ media(product, 'hero') }}
     <div class="card-top">
       <span class="pill pill-{{ product.tier }}">{{ product.tier }}</span>
-      <span class="pill pill-cat">{{ product.category.replace('-', ' ') }}</span>
+      <span class="pill pill-cat">{{ product.category|track }}</span>
       {% if product.brand %}<span class="pill pill-plain">{{ product.brand }}</span>{% endif %}
     </div>
     <h1>{{ product.title }}</h1>
@@ -32,22 +32,22 @@
     <div class="price-big">{{ product.price_cents|money }}</div>
     <dl class="meta">
       <dt>Brand</dt><dd>{{ product.brand or '—' }}</dd>
-      <dt>Tier</dt><dd>{{ product.tier }}</dd>
+      <dt>Level</dt><dd>{{ product.tier }}</dd>
       <dt>Rating</dt><dd>★ {{ '%.1f'|format(product.rating) }}</dd>
-      <dt>In stock</dt><dd>Yes</dd>
+      <dt>Access</dt><dd>Self-paced</dd>
     </dl>
     <button class="btn btn-primary btn-block"
-            data-track-click="add_to_cart" data-product-slug="{{ product.slug }}"
-            data-toast="Added to your basket">Add to basket</button>
+            data-track-click="enroll" data-product-slug="{{ product.slug }}"
+            data-toast="You're enrolled — happy studying">Enrol now</button>
     <button class="btn btn-ghost btn-block"
-            data-track-click="purchase" data-product-slug="{{ product.slug }}"
-            data-toast="Thanks — order placed">Buy now</button>
+            data-track-click="wishlist" data-product-slug="{{ product.slug }}"
+            data-toast="Saved to your list">Save for later</button>
   </aside>
 </article>
 
 {% if related %}
 <section>
-  <h2 class="section-title">More in {{ product.category.replace('-', ' ') }}</h2>
+  <h2 class="section-title">More in {{ product.category|track }}</h2>
   <div class="grid">
     {% for p in related %}{{ product_card(p, loop.index0, 'related') }}{% endfor %}
   </div>

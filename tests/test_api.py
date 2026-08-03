@@ -34,19 +34,19 @@ class TestPublicPages:
     def test_catalogue_renders(self, client):
         response = client.get("/")
         assert response.status_code == 200
-        assert "Sony WH-1000XM5 Wireless Headphones" in response.text
+        assert "Deep Learning Specialization" in response.text
 
     def test_product_detail_exposes_tracking_attributes(self, client, catalog):
-        response = client.get("/products/sony-wh-1000xm5-wireless-headphones")
+        response = client.get("/products/deep-learning-specialization")
         assert response.status_code == 200
-        assert 'data-product-slug="sony-wh-1000xm5-wireless-headphones"' in response.text
+        assert 'data-product-slug="deep-learning-specialization"' in response.text
 
     def test_unknown_product_is_404(self, client):
         assert client.get("/products/does-not-exist").status_code == 404
 
     def test_search(self, client):
-        response = client.get("/search", params={"q": "oled"})
-        assert "LG C4 65in OLED evo TV" in response.text
+        response = client.get("/search", params={"q": "sql"})
+        assert "SQL for Data Analysis" in response.text
 
     def test_security_headers(self, client):
         headers = client.get("/").headers
@@ -147,7 +147,7 @@ class TestEventIngest:
         response = client.post(
             "/api/events/batch",
             json={"events": [
-                {"type": "product_view", "product_slug": "hisense-u6n-55in-mini-led-tv",
+                {"type": "product_view", "product_slug": "practical-ethical-hacking",
                  "idem": "api-1"},
                 {"type": "search", "query": "kubernetes", "idem": "api-2"},
             ]},
@@ -213,6 +213,37 @@ class TestEventIngest:
         )
         assert client_batch <= server_cap
 
+    def test_every_event_the_ui_emits_is_accepted_and_weighted(self):
+        """Three lists have to agree: what the UI emits, what the schema accepts, and
+        what the profile scores. They drifted during the domain migration — `enroll` and
+        `wishlist` were wired into the buttons but never added to EVENT_TYPES, so the two
+        highest-intent signals in the product were 422'd and dropped in silence.
+        """
+        import re
+
+        from app.config import ROOT
+        from app.schemas import EVENT_TYPES
+        from app.services.profile import EVENT_WEIGHTS
+
+        js = (ROOT / "app" / "static" / "js" / "tracker.js").read_text(encoding="utf-8")
+        html = "\n".join(
+            p.read_text(encoding="utf-8")
+            for p in (ROOT / "app" / "templates").rglob("*.html")
+        )
+        emitted = set(re.findall(r'track\("([a-z_]+)"', js)) | set(
+            re.findall(r'data-track-click="([a-z_]+)"', html)
+        )
+        # The card picks its type with a Jinja conditional, so read those out too.
+        emitted |= set(re.findall(r"'([a-z_]+click)' if ", html))
+        emitted |= set(re.findall(r" else '([a-z_]+click)'", html))
+
+        assert emitted, "found no emitted event types — the regexes have rotted"
+        assert emitted <= EVENT_TYPES, f"emitted but rejected by the API: {emitted - EVENT_TYPES}"
+        # dwell is scored by duration in _dwell_weight(), not by a flat weight.
+        assert emitted - {"dwell"} <= set(EVENT_WEIGHTS), (
+            f"accepted but scored 0.1 by default: {emitted - {'dwell'} - set(EVENT_WEIGHTS)}"
+        )
+
     def test_the_client_retries_on_a_rejected_response_not_only_a_dead_network(self):
         """fetch() resolves on 429 and 500 — only a network failure rejects it. A
         `.catch()`-only handler therefore drops exactly the batches worth retrying."""
@@ -234,7 +265,7 @@ class TestEventIngest:
         client.post(
             "/api/events/batch",
             json={"events": [{"type": "product_view",
-                              "product_slug": "google-pixel-8a-128gb", "idem": "attach-1"}]},
+                              "product_slug": "sql-for-data-analysis", "idem": "attach-1"}]},
         )
         _flush(client)
         with session_scope() as db:
@@ -284,7 +315,7 @@ class TestAdminAccessControl:
         response = client.post(
             "/admin/products",
             data={"title": "API Created Product", "description": "Created over HTTP",
-                  "category": "misc", "tier": "entry", "tags": "api, test",
+                  "category": "misc", "tier": "beginner", "tags": "api, test",
                   "price": "10", "rating": "4.0",
                   "brand": "Tester", "is_published": "on", **csrf(client)},
             follow_redirects=False,

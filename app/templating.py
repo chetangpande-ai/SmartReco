@@ -9,7 +9,13 @@ from app.config import ROOT
 from app.security import CSRF_FIELD
 
 templates = Jinja2Templates(directory=str(ROOT / "app" / "templates"))
-templates.env.filters["money"] = lambda cents: f"${cents / 100:,.0f}"
+
+# Several courses in the catalogue genuinely cost nothing, and "$0" reads like a bug.
+templates.env.filters["money"] = lambda cents: "Free" if not cents else f"${cents / 100:,.0f}"
+
+# Track slugs are title-cased by CSS, which turns "ai-ml" into "Ai Ml".
+_TRACK_LABELS = {"ai-ml": "AI & ML", "web-dev": "Web Dev"}
+templates.env.filters["track"] = lambda slug: _TRACK_LABELS.get(slug, slug.replace("-", " "))
 
 
 def _hue(text: str) -> int:

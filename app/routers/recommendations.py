@@ -1,4 +1,4 @@
-"""The shopper's recommendation page.
+"""The learner's recommendation page.
 
 Generation never happens inside the request. The agent takes seconds; a page that
 blocks on it is a page that feels broken. Instead the route renders immediately with

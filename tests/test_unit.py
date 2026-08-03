@@ -143,24 +143,34 @@ class TestGuardrails:
     @pytest.mark.parametrize(
         "text",
         [
-            "In stock and ready to go",
-            "Only 2 left in stock",
-            "Grab one while stocks last",
-            "Ships today if you order now",
-            "Comes with free shipping",
-            "Next-day delivery included",
-            "Backed by a 3-year warranty",
-            "The lowest price ever on this model",
-            "A recent price drop makes it worth a look",
-            "The cheapest way into full-frame",
+            "Comes with a job guarantee",
+            "Includes interview assistance",
+            "93% of graduates find work within six months",
+            "Alumni get hired at Google every year",
+            "A fully accredited programme",
+            "Recognised by employers worldwide",
+            "The cohort starts on Monday",
+            "Seats are filling fast",
+            "Includes 1-on-1 mentoring",
+            "Comes with a money-back promise",
+            "The lowest price ever on this one",
             "It's on sale right now",
         ],
     )
-    def test_blocks_commerce_claims_the_catalogue_cannot_support(self, text):
-        """A store has no stock, shipping, warranty or price-history fields — so every
-        one of these is invented, and every one is something a model reaches for
-        unprompted when asked to sell."""
+    def test_blocks_claims_the_catalogue_cannot_support(self, text):
+        """The catalogue has a title, provider, track, level, price, rating, tags and a
+        syllabus line — no accreditation, placement data, cohort dates or completion
+        statistics. Every one of these is invented, and every one is something a model
+        reaches for unprompted when told to sell education."""
         assert not guardrails.check_copy(text).ok
+
+    def test_a_syllabus_fact_is_not_treated_as_a_claim(self):
+        """One syllabus line genuinely says "lifetime access". A rail on it would reject
+        the model for quoting the catalogue correctly — the rails must forbid only what
+        the catalogue cannot support, never what it does."""
+        assert guardrails.check_copy("It includes lifetime access to the material.").ok
+        assert guardrails.check_copy("Cohort-based, over six weeks.").ok
+        assert guardrails.check_copy("Ends with a certificate.").ok
 
     def test_price_must_match_catalogue(self):
         allowed = {8900, 7900}
@@ -178,21 +188,21 @@ class TestGuardrails:
         """Real generated copy, to prove the rails above are not so broad that ordinary
         persuasion trips them. Specificity is what sells here, not adjectives."""
         good = (
-            "You've been comparing noise-cancelling headphones and spent four minutes on "
-            "the Sony WH-1000XM5. The Bose QuietComfort Ultra is the other end of that "
-            "comparison, with 24h battery and a head-tracked spatial mode."
+            "You've been working through the Machine Learning Specialization and spent four "
+            "minutes on the Deep Learning Specialization. That one picks up where the first "
+            "leaves off, across 5 courses at 10h/week."
         )
         assert guardrails.check_copy(good).ok
 
     def test_scrub_keeps_honest_sentences(self):
         mixed = (
-            "You've been comparing noise-cancelling headphones. "
-            "Only 2 left in stock so act now. "
-            "The Bose QuietComfort Ultra sits at the other end of that comparison."
+            "You've been working through the Machine Learning Specialization. "
+            "Seats are filling so act now. "
+            "The Deep Learning Specialization picks up where that leaves off."
         )
         cleaned = guardrails.scrub(mixed)
-        assert "stock" not in cleaned and "act now" not in cleaned
-        assert "noise-cancelling" in cleaned and "Bose" in cleaned
+        assert "Seats" not in cleaned and "act now" not in cleaned
+        assert "Machine Learning" in cleaned and "Deep Learning" in cleaned
 
     def test_validate_reports_every_violation(self):
         report = guardrails.validate("Guaranteed job. Only 2 seats left. 50% off.")
@@ -233,13 +243,13 @@ class TestEventRateLimit:
 
 class TestTokenizer:
     def test_drops_stopwords(self):
-        assert tokenize("the best cheap price for buying headphones") == ["headphones"]
+        assert tokenize("the best course for learning kubernetes") == ["learning", "kubernetes"]
 
     def test_keeps_the_words_that_actually_discriminate(self):
-        """Over-stopwording is the failure mode that matters: strip 'wireless' or
-        'noise' and the lexical half of the hybrid search stops contributing."""
-        assert set(tokenize("best cheap wireless noise cancelling headphones under 200")) == {
-            "wireless", "noise", "cancelling", "headphones", "200",
+        """Over-stopwording is the failure mode that matters: "learning" is in a third of
+        these titles, so removing it would gut the lexical half of the hybrid search."""
+        assert set(tokenize("best beginner tutorial for deep learning with pytorch")) == {
+            "beginner", "deep", "learning", "pytorch",
         }
 
     def test_keeps_technical_terms(self):

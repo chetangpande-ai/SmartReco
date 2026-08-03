@@ -38,7 +38,7 @@ class TokenBucket:
 
 # Sized against real traffic, because the cost here is one token per *event*, not per
 # request, and a single page view is worth about ten of them (product_view, four scroll
-# marks, four impressions, a dwell). At capacity=60/refill=1 an engaged shopper — the one
+# marks, four impressions, a dwell). At capacity=60/refill=1 an engaged learner — the one
 # whose profile is most worth building — was throttled after six pages and then held to
 # one event a second. That is a data-loss bug wearing an abuse-control costume.
 #

@@ -79,25 +79,26 @@ def analyze(state: AgentState) -> dict:
         parts.extend(prof.top_terms[:5])
         query = " ".join(dict.fromkeys(p for p in parts if p))[:300]
 
-        # Don't re-recommend something they already bought or have in the basket.
+        # Don't re-recommend something they already enrolled in or saved for later.
         committed = {
             pid
             for (pid,) in db.execute(
                 select(Event.product_id).where(
                     Event.user_id == state["user_id"],
-                    Event.type.in_(("purchase", "add_to_cart")),
+                    Event.type.in_(profile_service.COMMITTED_EVENTS),
                     Event.product_id.isnot(None),
                 )
             ).all()
         }
 
-        # Tier filter as an upgrade signal: someone consistently looking at flagship
-        # models is not shopping the entry shelf, and vice versa.
+        # Level filter as a progression signal: someone consistently opening advanced
+        # material has outgrown the introductory shelf, and vice versa. Always spans two
+        # rungs, because the next step up is exactly what a learner wants recommended.
         tiers = None
-        if prof.tier_affinity == "flagship":
-            tiers = ["mid", "flagship"]
-        elif prof.tier_affinity == "entry":
-            tiers = ["entry", "mid"]
+        if prof.tier_affinity == "advanced":
+            tiers = ["intermediate", "advanced"]
+        elif prof.tier_affinity == "beginner":
+            tiers = ["beginner", "intermediate"]
 
         # Generous price ceiling — a cap tight enough to bind would silently hide the
         # best match over a few dollars.
@@ -424,7 +425,7 @@ def finalize(state: AgentState) -> dict:
             **fallback,
         }
 
-    # Products survived but the prose did not. Strip the offending sentences.
+    # Courses survived but the prose did not. Strip the offending sentences.
     cleaned = guardrails.scrub(state.get("narrative", ""))
     return {
         "node_path": ["finalize"],
@@ -438,10 +439,10 @@ def finalize(state: AgentState) -> dict:
 # --------------------------------------------------------------------------- fallback
 def _plain_narrative(state: AgentState, picks: list[dict]) -> str:
     facts = state.get("evidence") or []
-    lead = f"Based on what you've been looking at — {facts[0]}" if facts else "Based on your recent browsing"
+    lead = f"Based on what you've been studying — {facts[0]}" if facts else "Based on your recent activity"
     return (
         f"{lead} — {'these' if len(picks) != 1 else 'this'} {len(picks)} "
-        f"product{'s' if len(picks) != 1 else ''} line up with that."
+        f"course{'s' if len(picks) != 1 else ''} follow on from that."
     )
 
 
@@ -458,13 +459,13 @@ def _deterministic_copy(state: AgentState, candidates: list[dict]) -> dict:
     # profile.evidence() phrases every fact as a bare predicate ("searched for 'x'
     # 3 times", "spent 4m reading 'y'"), so "You " + fact is always a sentence.
     subject = next((m.group(1) for f in facts if (m := _QUOTED.search(f))), "")
-    # Category comes off the retrieved set, not the filters: `analyze` deliberately does
-    # not filter by category — soft matching beats a hard fence for discovery — so
-    # reading it from there always produced an empty string.
-    category = (top[0]["category"] if top else "").replace("-", " ")
+    # Track comes off the retrieved set, not the filters: `analyze` deliberately does not
+    # filter by track — soft matching beats a hard fence for discovery — so reading it
+    # from there always produced an empty string.
+    track = (top[0]["category"] if top else "").replace("-", " ")
     headline = (
         f"More like {subject}"[:70] if subject
-        else (f"Picked from {category}"[:70] if category else "Picked for you")
+        else (f"Next in {track}"[:70] if track else "Picked for you")
     )
 
     if facts:
@@ -472,19 +473,19 @@ def _deterministic_copy(state: AgentState, candidates: list[dict]) -> dict:
         if len(facts) > 1:
             lead += f", and {facts[1]}"
     else:
-        lead = "Based on what you've been browsing"
+        lead = "Based on what you've been studying"
 
     titles = ", ".join(c["title"] for c in top[:2])
     narrative = (
-        f"{lead}. These are the closest matches in stock — starting with {titles}"
+        f"{lead}. These are the closest matches in the catalogue — starting with {titles}"
         f"{', plus more below' if len(top) > 2 else ''}."
     )
 
     picks = [
         {
             "product_id": c["product_id"],
-            "reason": f"{c['brand']} {c['category'].replace('-', ' ')}, "
-            f"{c['tier']} tier, rated {c['rating']:.1f}"
+            "reason": f"{c['brand']}, {c['category'].replace('-', ' ')}, "
+            f"{c['tier']} level, rated {c['rating']:.1f}"
             + (f" — {c['spec'].split(' · ')[0]}." if c.get("spec") else "."),
         }
         for c in top

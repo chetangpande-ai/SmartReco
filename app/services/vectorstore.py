@@ -343,9 +343,3 @@ def get_vector_store() -> VectorStore:
             _store = ChromaStore(embedder.id, embedder.dim)
         log.info("vector store ready", extra=_store.health())
     return _store
-
-
-def reset_vector_store() -> None:
-    """Drop the cached handle so the next call re-reads config. Tests use this."""
-    global _store
-    _store = None

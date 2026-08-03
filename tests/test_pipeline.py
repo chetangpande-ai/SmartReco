@@ -71,14 +71,14 @@ class TestBulkWrite:
 
     def test_resolves_slugs_in_one_pass(self, catalog, user_factory):
         uid = user_factory()
-        slug = "sony-wh-1000xm5-wireless-headphones"
+        slug = "deep-learning-specialization"
         ingestor._write(
             [to_row(EventIn(type="product_view", product_slug=slug, idem="s-1"),
                     user_id=uid, anon_id="a")]
         )
         with session_scope() as db:
             event = db.scalar(select(Event).where(Event.dedupe_key == "s-1"))
-            assert event.product_id == catalog["Sony WH-1000XM5 Wireless Headphones"]
+            assert event.product_id == catalog["Deep Learning Specialization"]
 
     def test_unknown_slug_leaves_product_null(self, catalog, user_factory):
         uid = user_factory()
@@ -93,14 +93,14 @@ class TestBulkWrite:
 class TestProfile:
     def test_recency_decay_halves_every_half_life(self, catalog, user_factory, event_factory):
         uid = user_factory()
-        recent = catalog["Sony WH-1000XM5 Wireless Headphones"]   # audio
-        older = catalog["Google Pixel 8a 128GB"]                  # phones
+        recent = catalog["Deep Learning Specialization"]   # ai-ml
+        older = catalog["SQL for Data Analysis"]                  # data
         event_factory(uid, "product_view", product_id=recent, hours_ago=0)
         event_factory(uid, "product_view", product_id=older,
                       hours_ago=settings.profile_halflife_hours * 2)
         with session_scope() as db:
             prof = P.refresh(db, uid)
-        assert prof.interests["phones"] / prof.interests["audio"] == pytest.approx(0.25, abs=0.02)
+        assert prof.interests["data"] / prof.interests["ai-ml"] == pytest.approx(0.25, abs=0.02)
 
     def test_intent_weighting_order(self):
         w = P.EVENT_WEIGHTS
@@ -115,28 +115,28 @@ class TestProfile:
         """Regression: vocabulary used to come from the user's own history, so someone
         who only searched had none."""
         uid = user_factory()
-        event_factory(uid, "search", query="audio wireless noise-cancelling", count=3)
+        event_factory(uid, "search", query="ai-ml deep-learning neural-networks", count=3)
         with session_scope() as db:
             prof = P.refresh(db, uid)
-        assert "audio" in prof.interests
-        assert "wireless" in prof.tag_scores
+        assert "ai-ml" in prof.interests
+        assert "deep-learning" in prof.tag_scores
         assert prof.centroid is not None
 
     def test_tier_brand_and_price_affinity(self, catalog, user_factory, event_factory):
         uid = user_factory()
-        for title in ["Sony WH-1000XM5 Wireless Headphones",
-                      "Bose QuietComfort Ultra Headphones"]:
+        for title in ["Deep Learning Specialization",
+                      "Natural Language Processing with Transformers"]:
             event_factory(uid, "product_view", product_id=catalog[title], count=2)
-        event_factory(uid, "product_view", product_id=catalog["Anker Soundcore Q30 Headphones"])
+        event_factory(uid, "product_view", product_id=catalog["Machine Learning Specialization"])
         with session_scope() as db:
             prof = P.refresh(db, uid)
-        assert prof.tier_affinity == "flagship", "four flagship views outweigh one entry view"
-        assert 7900 < prof.price_affinity_cents < 42900
-        assert set(prof.brand_scores) >= {"Sony", "Bose", "Anker"}
+        assert prof.tier_affinity == "advanced", "four advanced views outweigh one beginner view"
+        assert 4900 < prof.price_affinity_cents < 8900
+        assert set(prof.brand_scores) >= {"DeepLearning.AI", "O'Reilly"}
 
     def test_centroid_is_unit_length(self, catalog, user_factory, event_factory):
         uid = user_factory()
-        event_factory(uid, "product_view", product_id=catalog["Google Pixel 8a 128GB"], count=3)
+        event_factory(uid, "product_view", product_id=catalog["SQL for Data Analysis"], count=3)
         with session_scope() as db:
             prof = P.refresh(db, uid)
         assert np.linalg.norm(P.as_vector(prof.centroid)) == pytest.approx(1.0, abs=1e-4)
@@ -159,8 +159,8 @@ class TestProfile:
 class TestEvidence:
     def test_facts_compose_after_a_you_prefix(self, catalog, user_factory, event_factory):
         uid = user_factory()
-        pid = catalog["Sony WH-1000XM5 Wireless Headphones"]
-        event_factory(uid, "search", query="noise cancelling", count=2)
+        pid = catalog["Deep Learning Specialization"]
+        event_factory(uid, "search", query="deep learning", count=2)
         event_factory(uid, "dwell", product_id=pid, dwell_ms=252_000)
         event_factory(uid, "product_view", product_id=pid, count=2)
         with session_scope() as db:
@@ -168,13 +168,13 @@ class TestEvidence:
         assert facts
         for fact in facts:
             assert not fact[0].isupper(), f"{fact!r} will not read as 'You {fact}'"
-        assert any("searched for 'noise cancelling' 2 times" in f for f in facts)
+        assert any("searched for 'deep learning' 2 times" in f for f in facts)
         assert any("4m 12s" in f for f in facts)
-        assert any("keep coming back to Sony" in f for f in facts)
+        assert any("keep coming back to DeepLearning.AI" in f for f in facts)
 
     def test_short_dwell_is_not_reported(self, catalog, user_factory, event_factory):
         uid = user_factory()
-        event_factory(uid, "dwell", product_id=catalog["Google Pixel 8a 128GB"], dwell_ms=5_000)
+        event_factory(uid, "dwell", product_id=catalog["SQL for Data Analysis"], dwell_ms=5_000)
         with session_scope() as db:
             assert not any("spent" in f for f in P.evidence(db, uid))
 
@@ -203,7 +203,7 @@ class TestSignature:
     def test_stable_when_the_ranking_does_not_change(self, catalog, user_factory, event_factory):
         """Scores move on every event; a score-based key would never hit the cache."""
         uid = user_factory()
-        pid = catalog["Sony WH-1000XM5 Wireless Headphones"]
+        pid = catalog["Deep Learning Specialization"]
         event_factory(uid, "product_view", product_id=pid, count=4, hours_ago=0.2)
         with session_scope() as db:
             first = P.signature(P.refresh(db, uid))
@@ -214,11 +214,11 @@ class TestSignature:
     def test_changes_on_a_real_pivot(self, catalog, user_factory, event_factory):
         uid = user_factory()
         event_factory(uid, "product_view",
-                      product_id=catalog["Sony WH-1000XM5 Wireless Headphones"],
+                      product_id=catalog["Deep Learning Specialization"],
                       count=4, hours_ago=0.2)
         with session_scope() as db:
             before = P.signature(P.refresh(db, uid))
-        event_factory(uid, "product_view", product_id=catalog["Hisense U6N 55in Mini-LED TV"],
+        event_factory(uid, "product_view", product_id=catalog["Practical Ethical Hacking"],
                       count=12)
         event_factory(uid, "search", query="tv mini-led hdr", count=6)
         with session_scope() as db:
@@ -255,7 +255,7 @@ class TestTriggerPolicy:
 
     def test_warming_up(self, catalog, user_factory, event_factory):
         uid = user_factory()
-        event_factory(uid, "product_view", product_id=catalog["Google Pixel 8a 128GB"], count=3)
+        event_factory(uid, "product_view", product_id=catalog["SQL for Data Analysis"], count=3)
         with session_scope() as db:
             P.refresh(db, uid)
         decision = _decide(uid)
@@ -263,7 +263,7 @@ class TestTriggerPolicy:
 
     def test_first_recommendation_fires(self, catalog, user_factory, event_factory):
         uid = user_factory()
-        event_factory(uid, "product_view", product_id=catalog["Google Pixel 8a 128GB"], count=6)
+        event_factory(uid, "product_view", product_id=catalog["SQL for Data Analysis"], count=6)
         with session_scope() as db:
             P.refresh(db, uid)
         decision = _decide(uid)
@@ -271,7 +271,7 @@ class TestTriggerPolicy:
 
     def test_cache_hit_serves_without_a_call(self, catalog, user_factory, event_factory):
         uid = user_factory()
-        event_factory(uid, "product_view", product_id=catalog["Google Pixel 8a 128GB"], count=6)
+        event_factory(uid, "product_view", product_id=catalog["SQL for Data Analysis"], count=6)
         with session_scope() as db:
             signature = P.signature(P.refresh(db, uid))
         _give_recommendation(uid, signature=signature)
@@ -286,12 +286,12 @@ class TestTriggerPolicy:
         # Setup events are backdated so they sit unambiguously *before* the
         # recommendation; at hours_ago=0 they can share its timestamp and be
         # miscounted as new, which makes the assertion race the clock.
-        event_factory(uid, "product_view", product_id=catalog["Google Pixel 8a 128GB"],
+        event_factory(uid, "product_view", product_id=catalog["SQL for Data Analysis"],
                       count=6, hours_ago=0.05)
         with session_scope() as db:
             P.refresh(db, uid)
         _give_recommendation(uid, signature="OTHER")
-        event_factory(uid, "product_view", product_id=catalog["Hisense U6N 55in Mini-LED TV"],
+        event_factory(uid, "product_view", product_id=catalog["Practical Ethical Hacking"],
                       count=2)
         with session_scope() as db:
             P.refresh(db, uid)
@@ -299,12 +299,12 @@ class TestTriggerPolicy:
 
     def test_cooldown(self, catalog, user_factory, event_factory):
         uid = user_factory()
-        event_factory(uid, "product_view", product_id=catalog["Google Pixel 8a 128GB"],
+        event_factory(uid, "product_view", product_id=catalog["SQL for Data Analysis"],
                       count=6, hours_ago=0.05)
         with session_scope() as db:
             P.refresh(db, uid)
         _give_recommendation(uid, signature="OTHER")
-        event_factory(uid, "product_view", product_id=catalog["Hisense U6N 55in Mini-LED TV"],
+        event_factory(uid, "product_view", product_id=catalog["Practical Ethical Hacking"],
                       count=8)
         with session_scope() as db:
             P.refresh(db, uid)
@@ -312,7 +312,7 @@ class TestTriggerPolicy:
 
     def test_unchanged_interests_are_not_worth_a_call(self, catalog, user_factory, event_factory):
         uid = user_factory()
-        pid = catalog["Google Pixel 8a 128GB"]
+        pid = catalog["SQL for Data Analysis"]
         event_factory(uid, "product_view", product_id=pid, count=8, hours_ago=0.1)
         with session_scope() as db:
             prof = P.refresh(db, uid)
@@ -327,14 +327,14 @@ class TestTriggerPolicy:
 
     def test_drift_fires_a_run(self, catalog, user_factory, event_factory):
         uid = user_factory()
-        event_factory(uid, "product_view", product_id=catalog["Google Pixel 8a 128GB"],
+        event_factory(uid, "product_view", product_id=catalog["SQL for Data Analysis"],
                       count=8, hours_ago=0.1)
         with session_scope() as db:
             centroid = P.refresh(db, uid).centroid
         _give_recommendation(uid, signature="OTHER", minutes_ago=10, centroid=centroid)
         event_factory(uid, "product_view",
-                      product_id=catalog["Valve Steam Deck OLED 1TB"], count=10)
-        event_factory(uid, "search", query="gaming handheld portable", count=6)
+                      product_id=catalog["Data Engineering Zoomcamp"], count=10)
+        event_factory(uid, "search", query="security pentesting exploitation", count=6)
         with session_scope() as db:
             P.refresh(db, uid)
         decision = _decide(uid)
@@ -342,7 +342,7 @@ class TestTriggerPolicy:
 
     def test_staleness_fires_even_without_drift(self, catalog, user_factory, event_factory):
         uid = user_factory()
-        pid = catalog["Google Pixel 8a 128GB"]
+        pid = catalog["SQL for Data Analysis"]
         event_factory(uid, "product_view", product_id=pid, count=8, hours_ago=0.1)
         with session_scope() as db:
             centroid = P.refresh(db, uid).centroid
@@ -355,7 +355,7 @@ class TestTriggerPolicy:
 
     def test_expiry_forces_a_refresh(self, catalog, user_factory, event_factory):
         uid = user_factory()
-        pid = catalog["Google Pixel 8a 128GB"]
+        pid = catalog["SQL for Data Analysis"]
         event_factory(uid, "product_view", product_id=pid, count=8, hours_ago=0.1)
         with session_scope() as db:
             centroid = P.refresh(db, uid).centroid
@@ -369,7 +369,7 @@ class TestTriggerPolicy:
     def test_manual_refresh_overrides_behavioural_gates(self, catalog, user_factory,
                                                         event_factory):
         uid = user_factory()
-        event_factory(uid, "product_view", product_id=catalog["Google Pixel 8a 128GB"], count=6)
+        event_factory(uid, "product_view", product_id=catalog["SQL for Data Analysis"], count=6)
         with session_scope() as db:
             P.refresh(db, uid)
         _give_recommendation(uid, signature="OTHER")

@@ -34,10 +34,16 @@ from app.services.retrieval import tokenize
 
 log = logging.getLogger(__name__)
 
-# Relative worth of each signal. Explicit intent (search, basket, purchase) beats
-# passive exposure (page_view, impression) by design.
+# Relative worth of each signal. Explicit intent (search, wishlist, enrol) beats passive
+# exposure (page_view, impression) by design.
+#
+# `purchase` and `add_to_cart` are kept as aliases of `enroll` and `wishlist`: events
+# already in the database under the old names must keep counting, and a tracker.js still
+# sitting in someone's browser cache will go on sending them for a while.
 EVENT_WEIGHTS = {
+    "enroll": 5.0,
     "purchase": 5.0,
+    "wishlist": 3.0,
     "add_to_cart": 3.0,
     "search": 2.0,
     "search_result_click": 1.8,
@@ -49,6 +55,7 @@ EVENT_WEIGHTS = {
     "page_view": 0.15,
     "rec_impression": 0.05,
 }
+COMMITTED_EVENTS = ("enroll", "purchase", "wishlist", "add_to_cart")
 
 
 def _dwell_weight(dwell_ms: int) -> float:
@@ -253,8 +260,8 @@ def signature(profile: UserProfile) -> str:
         ",".join(list(profile.tag_scores)[:5]),
         profile.tier_affinity,
         ",".join(list(profile.brand_scores)[:2]),
-        # Price bucketed: a few dollars' difference is not a different shopper. Bands
-        # widen with price, because $20 matters on a $60 purchase and not on a $2000 one.
+        # Price bucketed: a few dollars' difference is not a different learner. Bands
+        # widen with price, because $20 matters on a $50 course and not on a $2000 cohort.
         str(int((profile.price_affinity_cents / 100) ** 0.5) // 3),
     ]
     return hashlib.sha256("|".join(parts).encode()).hexdigest()
@@ -265,13 +272,13 @@ def summarise(profile: UserProfile) -> str:
     if not profile.interests:
         return "no activity yet"
     cats = ", ".join(f"{k} ({v:.1f})" for k, v in list(profile.interests.items())[:3])
-    bits = [f"shopping for: {cats}"]
+    bits = [f"studying: {cats}"]
     if profile.recent_queries:
         bits.append(f"searched: {'; '.join(profile.recent_queries[:3])}")
     if profile.brand_scores:
-        bits.append(f"brands looked at: {', '.join(list(profile.brand_scores)[:3])}")
+        bits.append(f"providers looked at: {', '.join(list(profile.brand_scores)[:3])}")
     if profile.tier_affinity:
-        bits.append(f"tier: {profile.tier_affinity}")
+        bits.append(f"level: {profile.tier_affinity}")
     if profile.price_affinity_cents:
         bits.append(f"typical price: ${profile.price_affinity_cents / 100:,.0f}")
     return " | ".join(bits)
@@ -315,9 +322,9 @@ def evidence(db: Session, user_id: int, limit: int = 8) -> list[str]:
                 brands[r.brand] += 1
         elif r.type == "dwell" and r.title:
             dwell[r.title] += r.dwell_ms
-        elif r.type in ("purchase", "add_to_cart") and r.title:
-            verb = "bought" if r.type == "purchase" else "added to your basket"
-            statement = f"{verb} the {r.title}"
+        elif r.type in COMMITTED_EVENTS and r.title:
+            verb = "enrolled in" if r.type in ("enroll", "purchase") else "saved"
+            statement = f"{verb} {r.title}"
             if statement not in intents:
                 intents.append(statement)
 
@@ -334,10 +341,10 @@ def evidence(db: Session, user_id: int, limit: int = 8) -> list[str]:
             )
             facts.append(f"spent {spent} reading '{title}'")
     for title, count in sorted(views.items(), key=lambda kv: -kv[1])[:3]:
-        facts.append(f"looked at the {title}" + (f" {count} times" if count > 1 else ""))
+        facts.append(f"looked at {title}" + (f" {count} times" if count > 1 else ""))
     if categories:
         top_cat, n = max(categories.items(), key=lambda kv: kv[1])
-        facts.append(f"opened {n} {top_cat.replace('-', ' ')} product{'s' if n != 1 else ''}")
+        facts.append(f"opened {n} {top_cat.replace('-', ' ')} course{'s' if n != 1 else ''}")
     if brands:
         top_brand, n = max(brands.items(), key=lambda kv: kv[1])
         if n >= 2:
@@ -345,7 +352,7 @@ def evidence(db: Session, user_id: int, limit: int = 8) -> list[str]:
     if tiers:
         top_tier, n = max(tiers.items(), key=lambda kv: kv[1])
         if n >= 2:
-            facts.append(f"favour {top_tier}-tier models")
+            facts.append(f"favour {top_tier} material")
 
     # Every fact is phrased as a bare past-tense predicate so callers can prefix it with
     # "You " and get a sentence. The fallback copy writer depends on that.

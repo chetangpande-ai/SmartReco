@@ -14,7 +14,7 @@
         {% if rec.model %}<span class="pill pill-plain">{{ rec.model }}</span>{% endif %}
         <span class="pill pill-plain">confidence {{ '%.0f'|format(rec.confidence * 100) }}%</span>
       {% else %}
-        Browse a few products and your recommendations will build themselves.
+        Browse a few courses and your recommendations will build themselves.
       {% endif %}
     </p>
   </div>
@@ -52,7 +52,7 @@
           <div class="card-body">
             <div class="card-top">
               <span class="pill pill-{{ p.tier }}">{{ p.tier }}</span>
-              <span class="pill pill-cat">{{ p.category.replace('-', ' ') }}</span>
+              <span class="pill pill-cat">{{ p.category|track }}</span>
             </div>
             <h3 class="card-title">{{ p.title }}</h3>
             <p class="rec-reason">{{ entry.reason }}</p>
@@ -72,8 +72,8 @@
 <div class="empty-state">
   <h2>Nothing yet</h2>
   <p class="muted">
-    SmartReco needs a little behaviour to work with. Browse the shop, search for
-    something you're actually after, and your recommendations will appear here.
+    SmartReco needs a little behaviour to work with. Browse the catalogue, search for
+    something you actually want to learn, and your recommendations will appear here.
   </p>
   <a class="btn btn-primary" href="/">Start browsing</a>
 </div>

@@ -85,10 +85,6 @@ class LLMResult:
     cost_usd: float = 0.0
     latency_ms: int = 0
 
-    @property
-    def total_tokens(self) -> int:
-        return self.prompt_tokens + self.completion_tokens
-
 
 @dataclass
 class _Budget:

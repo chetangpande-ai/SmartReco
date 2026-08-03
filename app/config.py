@@ -81,21 +81,20 @@ class Settings(BaseSettings):
     retrieval_candidates: int = 40
     retrieval_mmr_lambda: float = 0.65
     # A kNN search always returns k results, however bad — on a small catalogue that
-    # means every product becomes a candidate and rank fusion ends up ranking noise.
+    # means every course becomes a candidate and rank fusion ends up ranking noise.
     # Cut relative to the best hit so the floor travels across embedding models
     # instead of being tuned to one, with a small absolute floor underneath.
     #
-    # Swept against the live index over 20 paraphrase probes (`make sweep`). Recall
-    # *improves* monotonically as the floor tightens, because with 35 products and a
-    # pool of 30 nearly the whole catalogue counts as a vector hit, so those ranks are
-    # noise that dilutes rank fusion:
-    #     ratio  0.00  0.35  0.45  0.50  0.55  0.65  0.80
-    #     r@3    0.85  0.85  0.85  0.85  0.95  1.00  1.00
-    #     r@5    0.90  0.90  0.90  1.00  1.00  1.00  1.00
-    #     pool   30.1  24.2  15.9  12.4   9.2   5.0   2.5
-    # 0.55 takes most of the gain while leaving MMR a pool worth diversifying over;
-    # past 0.65 the vector side nearly vanishes and BM25 is effectively deciding alone.
-    # Tuned on one catalogue — re-run `make sweep` if the catalogue changes shape.
+    # Swept against the live index over 20 paraphrase probes (`make sweep`). On the course
+    # catalogue quality is *flat* across the whole range — the fused ranking is already
+    # right, so the floor only controls how much noise MMR has to diversify over:
+    #     ratio  0.00  0.35  0.50  0.55  0.60  0.70  0.80
+    #     r@1    0.95  0.95  0.95  0.95  0.95  0.95  0.95
+    #     r@5    1.00  1.00  1.00  1.00  1.00  1.00  1.00
+    #     pool   32.8  26.0  13.3  10.0   7.5   3.9   1.9
+    # So the floor is chosen on pool size, not recall: `retrieve` asks for 8 candidates,
+    # and a pool of 10 gives MMR a real choice while 0.60 and tighter starves it below
+    # what was requested. Tuned on one catalogue — re-run `make sweep` if it changes shape.
     retrieval_score_ratio: float = 0.55
     retrieval_min_score: float = 0.10
     retrieval_grade_threshold: float = 0.60
@@ -164,10 +163,6 @@ class Settings(BaseSettings):
     @property
     def has_smtp(self) -> bool:
         return bool(self.smtp_host)
-
-    @property
-    def has_tracing(self) -> bool:
-        return bool(self.langsmith_tracing and self.langsmith_api_key) or self.logfire_enabled
 
 
 @lru_cache

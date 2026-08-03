@@ -168,7 +168,7 @@ h1 { font-size: 1.9rem; }
   font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; font-weight: 600;
   padding: 3px 8px; border-radius: 5px; background: var(--surface-2); color: var(--muted);
 }
-.pill-flagship { background: var(--accent-soft); color: var(--accent); }
+.pill-advanced { background: var(--accent-soft); color: var(--accent); }
 .card-spec { font-size: .78rem; color: var(--muted); margin: 0 0 8px; font-variant-numeric: tabular-nums; }
 .detail-spec { font-size: .9rem; color: var(--muted); margin: 0 0 14px; }
 .pill-cat { text-transform: capitalize; letter-spacing: 0; }

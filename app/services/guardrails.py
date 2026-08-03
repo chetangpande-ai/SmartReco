@@ -39,9 +39,9 @@ class GuardrailReport:
         self.violations.append(f"{rule}: {detail}")
 
 
-# Claims this catalogue cannot support. The earnings/employment rails read as leftovers
-# from a different storefront, and they are — they stay because they cost one regex each
-# and a model writing persuasive copy will reach for whichever register it was trained on.
+# Claims nobody selling a course can honestly make. These are the *primary* rails here:
+# a model asked to sell education will reach for "master this overnight" and "double your
+# salary" without being prompted, because its training data is saturated with them.
 _FORBIDDEN = [
     (r"\bguarantee(d|s)?\b", "outcome guarantee"),
     (r"\brisk[- ]free\b", "risk-free claim"),
@@ -52,9 +52,9 @@ _FORBIDDEN = [
     (r"\b(double|triple|10x|5x)\s+(your\s+)?(salary|income|pay)\b", "earnings promise"),
     (r"\bget\s+hired\s+(guaranteed|immediately|instantly)", "employment promise"),
     (r"\bsecret\s+(that|the\s+\w+\s+don'?t\s+want)", "conspiracy framing"),
-    # Real products invite comparative claims the catalogue cannot support. "Best fit
-    # for you" is fine and stays; "best on the market" is an assertion about products
-    # we hold no data on.
+    # Real courses invite comparative claims the catalogue cannot support. "Best fit
+    # for what you've been studying" is fine and stays; "the best course anywhere" is an
+    # assertion about courses we hold no data on.
     (r"\bbest\s+(on\s+the\s+market|in\s+(the\s+)?(world|class)|available\s+anywhere)\b",
      "unsupported superlative"),
     (r"\b(unmatched|unbeatable|second\s+to\s+none)\b", "unsupported superlative"),
@@ -62,7 +62,7 @@ _FORBIDDEN = [
     (r"\bworld'?s\s+(best|fastest|finest)\b", "unsupported superlative"),
 ]
 
-# Manufactured urgency and scarcity. The catalogue has no stock and no sales.
+# Manufactured urgency and scarcity. The catalogue has no enrolment windows and no sales.
 _FABRICATED_URGENCY = [
     (r"\b(only|just)\s+\d+\s+(seats?|spots?|places?|left|remaining)", "invented scarcity"),
     (r"\benrol+ment\s+closes?\b", "invented deadline"),
@@ -73,22 +73,30 @@ _FABRICATED_URGENCY = [
     (r"\blast\s+chance\b", "pressure language"),
 ]
 
-# Facts a *store* invites a model to invent, which is a different set from the ones a
-# course would. The catalogue has a title, brand, category, tier, price, rating, tags and
-# a spec line — no stock level, no shipping, no warranty, no price history. Every claim
-# below is therefore unsupported by construction, and all of them are things a model
-# writing shop copy reaches for unprompted.
+# Facts a *learning platform* invites a model to invent. The catalogue has a title,
+# provider, track, level, price, rating, tags and a syllabus line — no accreditation, no
+# job placement data, no cohort dates, no completion statistics, no instructor
+# availability. Every claim below is unsupported by construction, and all of them are
+# things a model writing course copy reaches for unprompted, because its training data is
+# full of exactly this register.
 _UNSUPPORTED_COMMERCE = [
-    (r"\b(in|back)\s+stock\b", "stock claim"),
-    (r"\b(only\s+)?\d+\s+left\s+in\s+stock\b", "stock claim"),
-    (r"\bwhile\s+(stocks?|supplies)\s+last\b", "stock claim"),
-    (r"\bships?\s+(today|tomorrow|free|within)\b", "shipping claim"),
-    (r"\bfree\s+(shipping|delivery|returns?)\b", "shipping claim"),
-    (r"\bnext[- ]day\s+delivery\b", "shipping claim"),
-    (r"\b\d+[- ]year\s+warranty\b", "warranty claim"),
-    (r"\b(lowest|best)\s+price\s+(ever|of\s+the\s+year|anywhere|guaranteed)\b", "price claim"),
-    (r"\bprice\s+(drop|cut|match)\b", "price claim"),
-    (r"\bcheapest\b", "price claim"),
+    (r"\b(job|employment|placement|interview)\s+(guarantee|guaranteed|assistance)\b",
+     "employment claim"),
+    (r"\b\d+\s*%\s+(of\s+)?(graduates?|students?|learners?)\b", "invented statistic"),
+    (r"\b(hired|employed)\s+(by|at)\s+(google|amazon|meta|microsoft|faang)\b",
+     "employer claim"),
+    (r"\b(accredited|university[- ]accredited|degree[- ]equivalent)\b", "accreditation claim"),
+    (r"\b(recognised|recognized|accepted)\s+by\s+employers\b", "accreditation claim"),
+    (r"\bcohort\s+(starts?|begins?)\s+(on\s+)?\w+day\b", "invented schedule"),
+    (r"\b(seats?|places?|spots?)\s+(are\s+)?(filling|limited|almost\s+gone)\b",
+     "invented scarcity"),
+    # NOT "lifetime access": one syllabus line genuinely says it, so a rail on it would
+    # reject the model for quoting the catalogue correctly. The rails must forbid only
+    # what the catalogue cannot support, never what it does.
+    (r"\b(1[- ]on[- ]1|one[- ]to[- ]one)\s+(mentoring|support|coaching)\b",
+     "unsupported entitlement"),
+    (r"\bmoney[- ]back\b", "unsupported entitlement"),
+    (r"\b(lowest|best)\s+price\s+(ever|anywhere|guaranteed)\b", "price claim"),
     (r"\bon\s+sale\b", "price claim"),
 ]
 

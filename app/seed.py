@@ -1,12 +1,17 @@
-"""Demo catalogue: 35 consumer electronics products across 8 categories, plus 3 users.
+"""Demo catalogue: 35 online courses across 8 tracks, plus 3 users.
 
-Real products, because a reviewer can judge instantly whether recommending the Bose
-QuietComfort Ultra to someone who lingered on the Sony WH-1000XM5 is sensible — that
-judgement is much harder to make about an unfamiliar catalogue.
+Recognisable courses and providers, because a reviewer can judge instantly whether
+recommending the Deep Learning Specialization to someone who lingered on the Machine
+Learning Specialization is sensible — that judgement is much harder to make about an
+invented catalogue.
 
-Descriptions are written rather than templated: retrieval quality depends on them, and
-a catalogue of "A good product" embeds into mush. Every fact here is also the *only*
-thing the agent is allowed to claim about a product, so the spec line matters.
+Descriptions are written rather than templated: retrieval quality depends on them, and a
+catalogue of "A good course" embeds into mush. Every fact here is also the *only* thing
+the agent is allowed to claim about a course, so the syllabus line matters.
+
+`tier` carries the learner's level — beginner, intermediate, advanced. It is the
+progression ladder the agent reasons about: someone who keeps opening advanced material
+is not shopping the introductory shelf.
 
     uv run python -m app.seed          # idempotent: safe to re-run
     uv run python -m app.seed --reset  # wipe first
@@ -27,168 +32,168 @@ from app.services.catalog import create_product
 
 log = logging.getLogger(__name__)
 
-# title, brand, category, tier, price$, rating, tags, spec, description
-PRODUCTS = [
-    # ---- audio -------------------------------------------------------------
-    ("Sony WH-1000XM5 Wireless Headphones", "Sony", "audio", "flagship", 399, 4.8,
-     ["noise-cancelling", "over-ear", "wireless", "travel"],
-     "30h battery · adaptive ANC · multipoint Bluetooth 5.2 · 250g",
-     "Eight microphones and two processors cancel low-frequency cabin noise well enough that long flights stop being tiring. Light clamp force for all-day wear, and the folding case survives being crushed into a bag."),
-    ("Bose QuietComfort Ultra Headphones", "Bose", "audio", "flagship", 429, 4.7,
-     ["noise-cancelling", "over-ear", "wireless", "spatial-audio"],
-     "24h battery · immersive spatial audio · Bluetooth 5.3 · 250g",
-     "The strongest noise cancellation on the market paired with a head-tracked spatial mode that places the sound in front of you rather than inside your skull. Comfortable enough to forget you are wearing them."),
-    ("Apple AirPods Pro 2 (USB-C)", "Apple", "audio", "mid", 249, 4.7,
-     ["earbuds", "noise-cancelling", "wireless", "apple"],
-     "6h buds / 30h case · adaptive audio · USB-C · IP54",
-     "In-ear cancellation that adapts to your surroundings in real time, plus conversation awareness that ducks the music when you start speaking. Seamless if the rest of your devices are Apple."),
-    ("Sennheiser HD 660S2 Open-Back Headphones", "Sennheiser", "audio", "flagship", 599, 4.6,
-     ["open-back", "wired", "audiophile", "studio"],
-     "300 ohm · open-back · detachable cable · 6.3mm and 4.4mm",
-     "Open-back reference headphones for listening at a desk, not on a train. Deep, textured bass extension and an unhurried midrange, but they leak sound in both directions and want a proper amplifier."),
-    ("Anker Soundcore Q30 Headphones", "Anker", "audio", "entry", 79, 4.4,
-     ["noise-cancelling", "over-ear", "wireless", "budget"],
-     "40h battery with ANC · hybrid ANC · multipoint · 260g",
-     "The sensible budget pick. Noise cancellation good enough for an open-plan office and battery life that outlasts anything costing four times as much."),
-    ("Sonos Era 300 Smart Speaker", "Sonos", "audio", "flagship", 449, 4.5,
-     ["speaker", "spatial-audio", "wifi", "smart-home"],
-     "Six drivers · Dolby Atmos · Wi-Fi 6 · Trueplay tuning",
-     "A single speaker that genuinely produces height and width, angling drivers sideways and upward. Pairs into a surround set with a Sonos soundbar."),
+# title, provider, track, level, price$, rating, tags, syllabus, description
+COURSES = [
+    # ---- ai-ml ---------------------------------------------------------------
+    ("Machine Learning Specialization", "DeepLearning.AI", "ai-ml", "beginner", 49, 4.9,
+     ["machine-learning", "python", "supervised-learning", "regression"],
+     "3 courses · 2 months at 10h/week · Python · certificate",
+     "Andrew Ng's rebuilt introduction to machine learning, taught in Python rather than Octave. Linear and logistic regression, neural networks, decision trees and clustering, with the maths kept to what you actually need to reason about a model."),
+    ("Deep Learning Specialization", "DeepLearning.AI", "ai-ml", "intermediate", 59, 4.8,
+     ["deep-learning", "neural-networks", "tensorflow", "cnn"],
+     "5 courses · 3 months at 10h/week · TensorFlow · certificate",
+     "Builds neural networks from the ground up before touching a framework, then covers convolutional and sequence models. The hyperparameter tuning and structuring-ML-projects courses are the part practitioners come back to."),
+    ("Neural Networks: Zero to Hero", "Andrej Karpathy", "ai-ml", "intermediate", 0, 4.9,
+     ["neural-networks", "backpropagation", "pytorch", "transformers"],
+     "10 video lectures · ~20h · PyTorch · code-along · free",
+     "Backpropagation implemented by hand, then micrograd, then makemore, then a GPT built line by line. Nothing is hidden behind a framework call, which is exactly why it sticks."),
+    ("LangChain for LLM Application Development", "DeepLearning.AI", "ai-ml", "intermediate", 0, 4.5,
+     ["llm", "langchain", "rag", "agents"],
+     "6 lessons · ~2h · Python notebooks · free",
+     "A short practical tour of chains, memory, retrieval over your own documents, and agents. Assumes you can already write Python and want the vocabulary rather than the theory."),
+    ("Practical Deep Learning for Coders", "fast.ai", "ai-ml", "beginner", 0, 4.8,
+     ["deep-learning", "pytorch", "computer-vision", "nlp"],
+     "8 lessons · ~40h · PyTorch and fastai · free",
+     "Top-down teaching: you train a working image classifier in lesson one, then peel back the layers over the course. Suits people who learn by getting something running and asking why afterwards."),
+    ("Natural Language Processing with Transformers", "O'Reilly", "ai-ml", "advanced", 89, 4.6,
+     ["nlp", "transformers", "huggingface", "fine-tuning"],
+     "11 chapters · ~30h · Hugging Face · text and notebooks",
+     "Attention, tokenisation, fine-tuning and distillation, worked through the Hugging Face stack. Goes into production concerns — latency, quantisation, serving — that most NLP material skips."),
 
-    # ---- phones ------------------------------------------------------------
-    ("Apple iPhone 15 Pro 256GB", "Apple", "phones", "flagship", 1099, 4.8,
-     ["smartphone", "titanium", "usb-c", "apple"],
-     "6.1in 120Hz OLED · A17 Pro · 48MP main · titanium · USB-C",
-     "Titanium frame drops meaningful weight from the previous generation, and the customisable Action button replaces the mute switch. The 48MP sensor finally shoots properly usable 24MP files by default."),
-    ("Samsung Galaxy S24 Ultra 512GB", "Samsung", "phones", "flagship", 1419, 4.7,
-     ["smartphone", "stylus", "telephoto", "android"],
-     "6.8in 120Hz · Snapdragon 8 Gen 3 · 200MP · S Pen · 5x optical",
-     "The most capable Android camera system available, with a 5x periscope that stays sharp in daylight and an S Pen tucked into the body. Big, heavy, and unapologetic about it."),
-    ("Google Pixel 8a 128GB", "Google", "phones", "mid", 499, 4.6,
-     ["smartphone", "camera", "android", "value"],
-     "6.1in 120Hz · Tensor G3 · 64MP main · 7 years of updates",
-     "Google's computational photography in a mid-range body, with seven years of OS and security updates — longer support than phones costing twice as much."),
-    ("Nothing Phone (2a) 256GB", "Nothing", "phones", "entry", 349, 4.3,
-     ["smartphone", "android", "budget", "design"],
-     "6.7in 120Hz AMOLED · Dimensity 7200 Pro · 50MP dual · 45W",
-     "Clean Android with a genuinely distinctive back panel. Fast where it matters — display, charging, day-to-day responsiveness — and honest about where it saves money."),
+    # ---- web-dev -------------------------------------------------------------
+    ("The Complete Web Developer Bootcamp", "Udemy", "web-dev", "beginner", 89, 4.7,
+     ["html", "css", "javascript", "fullstack"],
+     "65h video · 5 projects · lifetime access · certificate",
+     "The long-form path from no code at all to a deployed full-stack application. HTML and CSS, then JavaScript properly, then Node and databases. Its length is the point — nothing is skipped."),
+    ("Complete Intro to React", "Frontend Masters", "web-dev", "intermediate", 39, 4.8,
+     ["react", "javascript", "hooks", "frontend"],
+     "8h video · builds one app throughout · exercises",
+     "React taught by building a single application from an empty folder, with no scaffolding tool to hide the wiring. Hooks, context, routing and testing, in the order you would actually meet them."),
+    ("Total TypeScript", "Matt Pocock", "web-dev", "advanced", 249, 4.9,
+     ["typescript", "types", "generics", "javascript"],
+     "20h+ · interactive exercises · 200+ challenges",
+     "Type-level programming taught as puzzles you solve in your editor. Generics, conditional types, and the patterns behind well-typed libraries — for people who already write TypeScript and keep hitting its ceiling."),
+    ("Testing JavaScript", "Kent C. Dodds", "web-dev", "intermediate", 179, 4.7,
+     ["testing", "javascript", "react", "end-to-end"],
+     "20h video · unit, integration and e2e · exercises",
+     "Builds a testing framework from scratch so the tools stop being magic, then covers static analysis, unit, integration and end-to-end testing. Opinionated about testing behaviour rather than implementation."),
+    ("Responsive Web Design Certification", "freeCodeCamp", "web-dev", "beginner", 0, 4.6,
+     ["html", "css", "flexbox", "accessibility"],
+     "~300h · 5 build projects · certification · free",
+     "Hands-on HTML and CSS with no video at all — you write code in the browser and it checks your work. Covers flexbox, grid and accessibility, ending in five projects you build unaided."),
 
-    # ---- laptops -----------------------------------------------------------
-    ("Apple MacBook Air 15in M3 16GB/512GB", "Apple", "laptops", "flagship", 1499, 4.8,
-     ["laptop", "macos", "portable", "apple-silicon"],
-     "15.3in Liquid Retina · M3 · 18h battery · 1.51kg · fanless",
-     "A large screen in a fanless, silent chassis that still runs all day on battery. The machine to buy if you want a big display without carrying a heavy laptop."),
-    ("Dell XPS 14 (2024) Core Ultra 7", "Dell", "laptops", "flagship", 1699, 4.4,
-     ["laptop", "windows", "oled", "creator"],
-     "14.5in OLED 120Hz · Core Ultra 7 · RTX 4050 · 16GB · 1.7kg",
-     "An OLED panel with real contrast and a discrete GPU in a chassis thin enough to commute with. The invisible haptic trackpad and capacitive function row divide opinion sharply."),
-    ("Lenovo ThinkPad X1 Carbon Gen 12", "Lenovo", "laptops", "flagship", 1899, 4.6,
-     ["laptop", "windows", "business", "keyboard"],
-     "14in 2.8K OLED · Core Ultra 7 · 32GB · 1.09kg · MIL-STD",
-     "Still the best keyboard on any laptop, in a carbon-fibre chassis that weighs almost nothing and survives being treated badly. Serviceable, with excellent Linux support."),
-    ("ASUS Zenbook 14 OLED", "ASUS", "laptops", "mid", 899, 4.5,
-     ["laptop", "windows", "oled", "value"],
-     "14in 2.8K OLED 120Hz · Core Ultra 5 · 16GB · 1.2kg",
-     "An OLED display and a full metal body at a price where most competitors still ship dim LCDs and plastic. The obvious choice for writing and browsing rather than heavy compute."),
-    ("Framework Laptop 13 DIY Edition", "Framework", "laptops", "mid", 1049, 4.5,
-     ["laptop", "repairable", "modular", "linux"],
-     "13.5in 3:2 · Ryzen 7040 · swappable ports · user-serviceable",
-     "Every part is replaceable with a screwdriver and a QR code, including the ports. Buy it if you intend to keep and upgrade a laptop for a decade rather than replace it."),
+    # ---- data ----------------------------------------------------------------
+    ("Google Data Analytics Certificate", "Google", "data", "beginner", 49, 4.7,
+     ["data-analysis", "sql", "tableau", "career-change"],
+     "8 courses · 6 months at 10h/week · SQL, R, Tableau · certificate",
+     "Built for people entering analytics with no background: spreadsheets, then SQL, then visualisation, then R. Ends with a portfolio case study, and is explicitly aimed at landing a first analyst job."),
+    ("SQL for Data Analysis", "Udacity", "data", "beginner", 79, 4.5,
+     ["sql", "postgres", "joins", "window-functions"],
+     "4 weeks · PostgreSQL · query workspace · projects",
+     "Joins, aggregations, subqueries and window functions, practised against a real transactional database rather than toy tables. Stops short of database design, which is not what analysts need first."),
+    ("Data Engineering Zoomcamp", "DataTalks.Club", "data", "intermediate", 0, 4.7,
+     ["data-engineering", "dbt", "airflow", "spark"],
+     "9 weeks · Docker, dbt, Airflow, Spark, BigQuery · free",
+     "A full pipeline built week by week: ingestion, warehousing, transformation, orchestration and streaming. Cohort-based and project-heavy, ending with an end-to-end pipeline you deploy yourself."),
+    ("Statistics with Python Specialization", "University of Michigan", "data", "intermediate", 49, 4.6,
+     ["statistics", "python", "inference", "regression"],
+     "3 courses · 2 months · Python · certificate",
+     "Inference, fitting and interpreting models, taught with real datasets and an emphasis on when a method is and is not appropriate. The counterweight to learning modelling purely as library calls."),
+    ("Analytics Engineering with dbt", "dbt Labs", "data", "advanced", 0, 4.5,
+     ["dbt", "sql", "data-modelling", "warehouse"],
+     "Self-paced · dbt Cloud · modelling and testing · free",
+     "Turning raw warehouse tables into tested, documented, version-controlled models. Assumes strong SQL and is about the engineering discipline around it rather than the query language."),
 
-    # ---- cameras -----------------------------------------------------------
-    ("Sony Alpha A7 IV Mirrorless Body", "Sony", "cameras", "flagship", 2499, 4.8,
-     ["mirrorless", "full-frame", "hybrid", "video"],
-     "33MP full-frame · 4K60 · 10-bit 4:2:2 · IBIS · dual card",
-     "The default full-frame hybrid: reliable subject-tracking autofocus, genuinely usable 4K, and a sensor that holds detail well into high ISO. Heavy once a fast lens is attached."),
-    ("Fujifilm X-T5 Body", "Fujifilm", "cameras", "flagship", 1699, 4.7,
-     ["mirrorless", "aps-c", "retro", "photography"],
-     "40MP APS-C · 7-stop IBIS · dedicated dials · 557g",
-     "Physical dials for shutter speed and ISO mean you set exposure without entering a menu. Fuji's film simulations produce files you can use straight out of camera."),
-    ("Canon EOS R8 Body", "Canon", "cameras", "mid", 1499, 4.5,
-     ["mirrorless", "full-frame", "lightweight", "beginner"],
-     "24MP full-frame · 4K60 oversampled · Dual Pixel AF II · 461g",
-     "The lightest way into full-frame. Autofocus inherited from cameras costing three times as much, with compromises in battery life and a single card slot."),
-    ("Sony FE 24-70mm f/2.8 GM II Lens", "Sony", "cameras", "flagship", 2299, 4.9,
-     ["lens", "zoom", "full-frame", "professional"],
-     "24-70mm · f/2.8 constant · 695g · weather-sealed",
-     "The one lens that covers most professional work, rebuilt to be lighter and sharper than the original. Expensive, and the piece of glass most owners keep through several camera bodies."),
-    ("DJI Osmo Pocket 3 Creator Combo", "DJI", "cameras", "mid", 799, 4.6,
-     ["gimbal", "vlogging", "compact", "video"],
-     "1in sensor · 3-axis gimbal · 4K120 · rotating touchscreen",
-     "A stabilised 1-inch camera small enough to live in a pocket. Face tracking keeps you centred while walking, which is why it has largely replaced action cameras for talking-to-camera video."),
+    # ---- cloud ---------------------------------------------------------------
+    ("AWS Certified Solutions Architect Associate", "A Cloud Guru", "cloud", "intermediate", 129, 4.6,
+     ["aws", "certification", "architecture", "networking"],
+     "30h video · hands-on labs · practice exams · SAA-C03",
+     "Exam-focused but genuinely architectural: virtual networks, identity, storage classes, high availability and cost. The labs matter more than the videos, and the practice exams are close to the real thing."),
+    ("Docker and Kubernetes: The Complete Guide", "Udemy", "cloud", "intermediate", 94, 4.7,
+     ["docker", "kubernetes", "devops", "ci-cd"],
+     "22h video · multi-container apps · CI/CD · certificate",
+     "Containers from first principles, then multi-container applications, then Kubernetes with a real deployment pipeline. Ends with a working CI/CD setup rather than a cluster you never ship to."),
+    ("Terraform Deep Dive", "Pluralsight", "cloud", "advanced", 99, 4.4,
+     ["terraform", "infrastructure-as-code", "modules", "devops"],
+     "12h video · modules, state, workspaces · labs",
+     "State management, module design and the failure modes that only show up on a team — drift, locking, and refactoring live infrastructure without downtime. Assumes you have already written some Terraform."),
+    ("Google Cloud Professional Data Engineer", "Coursera", "cloud", "advanced", 59, 4.5,
+     ["gcp", "bigquery", "streaming", "certification"],
+     "6 courses · 3 months · BigQuery, Dataflow, Pub/Sub · certificate",
+     "Designing data systems on Google Cloud: batch and streaming pipelines, warehouse modelling, and the trade-offs between managed services. Certification-aligned but heavier on design than on trivia."),
 
-    # ---- tv ----------------------------------------------------------------
-    ("LG C4 65in OLED evo TV", "LG", "tv", "flagship", 1799, 4.8,
-     ["oled", "4k", "gaming", "hdr"],
-     "65in OLED · 144Hz · 4x HDMI 2.1 · Dolby Vision · webOS",
-     "Perfect blacks and per-pixel contrast, with four full-bandwidth HDMI 2.1 ports so a console and a PC can both run at high refresh. The reference choice for a dark room."),
-    ("Samsung QN90D 55in Neo QLED TV", "Samsung", "tv", "flagship", 1299, 4.6,
-     ["qled", "4k", "bright-room", "gaming"],
-     "55in mini-LED · 144Hz · anti-glare · HDR10+ · Tizen",
-     "Mini-LED backlighting gets far brighter than OLED, which matters in a room with windows. The matte anti-reflection layer is the reason to pick this over a cheaper panel."),
-    ("Hisense U6N 55in Mini-LED TV", "Hisense", "tv", "entry", 549, 4.3,
-     ["mini-led", "4k", "budget", "hdr"],
-     "55in mini-LED · 60Hz · Dolby Vision · Google TV",
-     "Genuine mini-LED backlighting and Dolby Vision at a price that used to buy a basic edge-lit panel. 60Hz limits it for gaming, but for film and television it punches far above its cost."),
-    ("Sonos Arc Ultra Soundbar", "Sonos", "tv", "flagship", 999, 4.6,
-     ["soundbar", "dolby-atmos", "wifi", "home-cinema"],
-     "14 drivers · Dolby Atmos · eARC · Trueplay · Wi-Fi 6",
-     "Height channels that actually reach the ceiling and come back, plus speech enhancement that rescues muttered dialogue. Expands with a sub and rear speakers later."),
+    # ---- security ------------------------------------------------------------
+    ("Practical Ethical Hacking", "TCM Security", "security", "beginner", 30, 4.8,
+     ["pentesting", "linux", "networking", "active-directory"],
+     "25h video · lab environment · Active Directory · certificate",
+     "Networking and Linux fundamentals first, then reconnaissance, exploitation and Active Directory attacks in a lab you build yourself. Widely recommended as the first step before a practical certification."),
+    ("Web Security Academy", "PortSwigger", "security", "intermediate", 0, 4.9,
+     ["web-security", "owasp", "xss", "sql-injection"],
+     "200+ labs · browser-based · Burp Suite · free",
+     "Every major class of web vulnerability with a working lab to exploit, written by the people who build Burp Suite. Reading is minimal; you learn by breaking something and being told exactly why it broke."),
+    ("Offensive Security Certified Professional", "OffSec", "security", "advanced", 1649, 4.7,
+     ["pentesting", "certification", "exploitation", "reporting"],
+     "PEN-200 course · 90 days lab access · 24h practical exam",
+     "The practical penetration testing certification: a 24-hour hands-on exam against machines you must actually compromise. Demanding, expensive, and the credential hiring managers recognise."),
+    ("Security Engineering Fundamentals", "Educative", "security", "intermediate", 59, 4.3,
+     ["appsec", "threat-modelling", "cryptography", "secure-design"],
+     "Text-based · interactive · threat modelling · ~15h",
+     "Designing systems that fail safely: threat modelling, applied cryptography, secrets handling and authentication design. Aimed at engineers who build the systems rather than the people testing them."),
 
-    # ---- smart home --------------------------------------------------------
-    ("Philips Hue White & Colour Starter Kit", "Philips", "smart-home", "mid", 179, 4.6,
-     ["lighting", "zigbee", "smart-home", "matter"],
-     "3 bulbs + bridge · 16M colours · Matter · Zigbee",
-     "The lighting system everything else integrates with. The bridge keeps working when your internet does not, which is the difference between smart lighting and frustrating lighting."),
-    ("Aqara Smart Hub M3 with Sensors", "Aqara", "smart-home", "mid", 129, 4.4,
-     ["hub", "sensors", "matter", "automation"],
-     "Matter controller · Thread border router · IR blaster · local",
-     "Runs automations locally rather than in someone's cloud, bridges Zigbee and Thread devices into Matter, and replaces every infrared remote in the room."),
-    ("Ecobee Smart Thermostat Premium", "Ecobee", "smart-home", "flagship", 249, 4.5,
-     ["thermostat", "energy", "smart-home", "sensors"],
-     "Room sensors · air quality monitor · Matter · built-in speaker",
-     "Remote sensors mean the house heats to the temperature of the room you are in rather than the hallway. Pays for itself over a couple of winters in a badly balanced home."),
-    ("Ring Battery Doorbell Plus", "Ring", "smart-home", "entry", 149, 4.2,
-     ["doorbell", "camera", "security", "battery"],
-     "1536p head-to-toe view · battery · two-way talk · no wiring",
-     "Installs without touching mains wiring, and the taller sensor shows a whole person and any parcel on the doorstep rather than a cropped face."),
+    # ---- design --------------------------------------------------------------
+    ("UI/UX Design Specialization", "CalArts", "design", "beginner", 49, 4.6,
+     ["ui", "ux", "figma", "portfolio"],
+     "4 courses · 3 months · Figma · portfolio project · certificate",
+     "Design fundamentals taught by an art school: typography, colour and layout before tooling. Ends with a portfolio piece, which is the part that matters when nobody will read your certificate."),
+    ("Design Systems with Figma", "Interaction Design Foundation", "design", "intermediate", 45, 4.4,
+     ["figma", "design-systems", "components", "documentation"],
+     "Self-paced · components, variants, tokens · ~20h",
+     "Building a component library other people can actually use: naming, variants, tokens and the documentation that stops a system rotting six months after launch."),
+    ("Refactoring UI", "Adam Wathan and Steve Schoger", "design", "beginner", 149, 4.9,
+     ["visual-design", "css", "typography", "spacing"],
+     "Book and 200 tips · before and after examples · for developers",
+     "Visual design as a set of concrete rules for people who write code and cannot draw. Spacing, hierarchy, colour and depth, each shown as a before and after rather than explained in the abstract."),
+    ("Motion Design for Interfaces", "School of Motion", "design", "advanced", 399, 4.5,
+     ["motion", "animation", "prototyping", "interaction"],
+     "8 weeks · After Effects · critiqued assignments",
+     "Easing, choreography and the timing that makes an interface feel responsive rather than decorative. Assignments are critiqued by working motion designers, which is most of what you pay for."),
 
-    # ---- gaming ------------------------------------------------------------
-    ("Sony PlayStation 5 Slim Disc Edition", "Sony", "gaming", "flagship", 499, 4.7,
-     ["console", "4k", "gaming", "disc"],
-     "4K120 · ray tracing · 1TB SSD · DualSense haptics",
-     "The haptic triggers change how games feel in a way screenshots cannot convey. The disc drive is detachable, so a physical library stays usable."),
-    ("Valve Steam Deck OLED 1TB", "Valve", "gaming", "flagship", 649, 4.8,
-     ["handheld", "pc-gaming", "linux", "portable"],
-     "7.4in HDR OLED 90Hz · 1TB · 50Wh · SteamOS",
-     "A full PC that plays your existing Steam library on a train. The OLED revision fixed the battery life and screen complaints of the original."),
-    ("NVIDIA GeForce RTX 4070 Super 12GB", "NVIDIA", "gaming", "flagship", 599, 4.6,
-     ["gpu", "pc-gaming", "ray-tracing", "dlss"],
-     "12GB GDDR6X · DLSS 3 · 220W · 1440p high refresh",
-     "The sensible high-refresh 1440p card. DLSS frame generation makes ray tracing playable at settings the raw silicon could not otherwise sustain."),
-    ("Logitech G Pro X Superlight 2", "Logitech", "gaming", "mid", 159, 4.7,
-     ["mouse", "wireless", "esports", "lightweight"],
-     "60g · 32K DPI · 95h battery · USB-C · hybrid switches",
-     "Sixty grams and no perceptible wireless latency. The mouse most competitive players actually use, which is unusual for a product marketed at them."),
+    # ---- product -------------------------------------------------------------
+    ("Digital Product Management", "University of Virginia", "product", "beginner", 49, 4.6,
+     ["product-management", "discovery", "roadmap", "agile"],
+     "5 courses · 2 months · case studies · certificate",
+     "The product manager's job described honestly: discovery, prioritisation, working with engineering, and measuring whether anything improved. Case-study driven rather than framework worship."),
+    ("Product Analytics", "Reforge", "product", "advanced", 1995, 4.7,
+     ["analytics", "experimentation", "retention", "metrics"],
+     "6 weeks · cohort-based · live sessions · peer projects",
+     "Choosing metrics that survive contact with reality, designing experiments, and reading retention curves. Cohort-based and expensive; the peer group is a large part of the value."),
+    ("Continuous Discovery Habits", "Teresa Torres", "product", "intermediate", 299, 4.8,
+     ["discovery", "user-research", "interviewing", "assumptions"],
+     "Self-paced · opportunity solution trees · templates",
+     "A weekly research habit rather than a research phase: interviewing continuously, mapping opportunities, and testing assumptions before building. Practical and unusually specific about the mechanics."),
+    ("Technical Writing for Engineers", "Google", "product", "beginner", 0, 4.5,
+     ["writing", "documentation", "communication", "editing"],
+     "2 courses · ~8h · exercises · free",
+     "Editing your own writing down to something readable: active voice, short sentences, and structuring a document so people can skim it. Short, free, and applies to every design doc you will ever write."),
 
-    # ---- wearables ---------------------------------------------------------
-    ("Apple Watch Series 10 46mm GPS", "Apple", "wearables", "flagship", 429, 4.7,
-     ["smartwatch", "fitness", "health", "apple"],
-     "Wide-angle OLED · ECG · sleep apnoea alerts · 18h · IP6X",
-     "The thinnest Apple Watch with the largest display, adding sleep apnoea detection. Genuinely useful health monitoring, provided you carry an iPhone."),
-    ("Garmin Forerunner 265 Music", "Garmin", "wearables", "mid", 449, 4.7,
-     ["running", "gps", "amoled", "training"],
-     "AMOLED · 13 days smartwatch / 20h GPS · offline music · multi-band",
-     "Training load and recovery metrics that actually inform how you plan a week, with multi-band GPS that holds a track between tall buildings. Battery measured in weeks, not hours."),
-    ("Oura Ring Gen 4 Silver", "Oura", "wearables", "mid", 349, 4.3,
-     ["sleep", "recovery", "health", "ring"],
-     "Up to 8 days · sleep staging · temperature trends · titanium",
-     "Sleep and recovery tracking from something you forget you are wearing, which is the entire argument against a wrist device for sleep. Requires a subscription for the full analysis."),
+    # ---- career --------------------------------------------------------------
+    ("Grokking the Coding Interview", "Educative", "career", "intermediate", 79, 4.6,
+     ["interview-prep", "algorithms", "patterns", "problem-solving"],
+     "Text-based · 16 patterns · 180+ problems · interactive",
+     "Coding interview problems grouped into sixteen recurring patterns rather than memorised individually, so an unseen question maps onto something you have already solved."),
+    ("System Design Interview Course", "ByteByteGo", "career", "advanced", 149, 4.7,
+     ["system-design", "scalability", "interview-prep", "architecture"],
+     "Illustrated · 30+ case studies · deep dives",
+     "Real systems worked through end to end — a URL shortener, a news feed, a chat service — with the trade-offs stated rather than assumed. Heavily illustrated, which is why the concepts stick."),
+    ("Speaking to Technical Audiences", "LinkedIn Learning", "career", "beginner", 35, 4.2,
+     ["communication", "presenting", "storytelling", "public-speaking"],
+     "4h video · exercises · certificate",
+     "Structuring a talk, handling questions you cannot answer, and presenting technical work to people who do not share your context. Short and practical rather than inspirational."),
 ]
 
 DEMO_USERS = [
     ("admin@smartreco.dev", "admin12345", "Admin", "admin"),
-    ("shopper@smartreco.dev", "shopper12345", "Alex Rivera", "user"),
+    ("learner@smartreco.dev", "learner12345", "Alex Rivera", "user"),
     ("demo@smartreco.dev", "demo12345", "Demo User", "user"),
 ]
 
@@ -206,7 +211,7 @@ def seed(reset: bool = False) -> dict:
         Base.metadata.drop_all(bind=engine)
         init_db()
 
-    created_users, created_products = 0, 0
+    created_users, created_courses = 0, 0
 
     with session_scope() as db:
         for email, password, name, role in DEMO_USERS:
@@ -220,7 +225,7 @@ def seed(reset: bool = False) -> dict:
 
     with session_scope() as db:
         existing = {t for (t,) in db.execute(select(Product.title)).all()}
-        for title, brand, category, tier, price, rating, tags, spec, description in PRODUCTS:
+        for title, provider, track, level, price, rating, tags, syllabus, description in COURSES:
             if title in existing:
                 continue
             create_product(
@@ -228,29 +233,29 @@ def seed(reset: bool = False) -> dict:
                 ProductIn(
                     title=title,
                     description=description,
-                    category=category,
-                    tier=tier,
+                    category=track,
+                    tier=level,
                     tags=tags,
                     price_cents=price * 100,
-                    brand=brand,
-                    spec=spec,
+                    brand=provider,
+                    spec=syllabus,
                     rating=rating,
                     is_published=True,
                 ),
             )
-            created_products += 1
+            created_courses += 1
 
-    # One drain embeds every new product in a single batched call rather than one per row.
+    # One drain embeds every new course in a single batched call rather than one per row.
     synced = outbox.drain_all()
     health = outbox.health()
 
     log.info(
         "seed complete",
-        extra={"users": created_users, "products": created_products, "synced": synced},
+        extra={"users": created_users, "courses": created_courses, "synced": synced},
     )
     return {
         "users_created": created_users,
-        "products_created": created_products,
+        "products_created": created_courses,
         "sync": synced,
         "health": health,
     }
@@ -262,10 +267,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     result = seed(reset=args.reset)
-    print(f"\nusers created:    {result['users_created']}")
-    print(f"products created: {result['products_created']}")
-    print(f"vector sync:      {result['sync']}")
-    print(f"in sync:          {result['health']['in_sync']} "
+    print(f"\nusers created:   {result['users_created']}")
+    print(f"courses created: {result['products_created']}")
+    print(f"vector sync:     {result['sync']}")
+    print(f"in sync:         {result['health']['in_sync']} "
           f"(sql={result['health']['sql_published']} vectors={result['health']['vector_count']})")
     print("\nsign in as:")
     for email, password, _, role in DEMO_USERS:

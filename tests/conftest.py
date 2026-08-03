@@ -49,59 +49,59 @@ from app.schemas import ProductIn  # noqa: E402
 from app.security import hash_password  # noqa: E402
 
 # Small fixed catalogue: big enough for retrieval to be meaningful, small enough that
-# the whole suite stays fast. Two brands appear twice so brand affinity is testable.
+# the whole suite stays fast. Two providers appear twice so provider affinity is testable.
 CATALOG = [
-    ("Sony WH-1000XM5 Wireless Headphones", "Sony", "audio", "flagship", 39900,
-     ["noise-cancelling", "over-ear", "wireless", "travel"],
-     "30h battery · adaptive ANC · Bluetooth 5.2",
-     "Eight microphones cancel low-frequency cabin noise well enough that long flights stop being tiring."),
-    ("Bose QuietComfort Ultra Headphones", "Bose", "audio", "flagship", 42900,
-     ["noise-cancelling", "over-ear", "wireless", "spatial-audio"],
-     "24h battery · immersive spatial audio · Bluetooth 5.3",
-     "The strongest noise cancellation available, with a head-tracked spatial mode."),
-    ("Anker Soundcore Q30 Headphones", "Anker", "audio", "entry", 7900,
-     ["noise-cancelling", "over-ear", "wireless", "budget"],
-     "40h battery with ANC · hybrid ANC · multipoint",
-     "Cancellation good enough for an open-plan office at a fraction of the price."),
-    ("Apple AirPods Pro 2 (USB-C)", "Apple", "audio", "mid", 24900,
-     ["earbuds", "noise-cancelling", "wireless"],
-     "6h buds / 30h case · adaptive audio · USB-C",
-     "In-ear cancellation that adapts to your surroundings in real time."),
-    ("Apple iPhone 15 Pro 256GB", "Apple", "phones", "flagship", 109900,
-     ["smartphone", "titanium", "usb-c"],
-     "6.1in 120Hz OLED · A17 Pro · 48MP main",
-     "Titanium frame, customisable Action button, and a 48MP main sensor."),
-    ("Google Pixel 8a 128GB", "Google", "phones", "mid", 49900,
-     ["smartphone", "camera", "android", "value"],
-     "6.1in 120Hz · Tensor G3 · 7 years of updates",
-     "Computational photography in a mid-range body with unusually long software support."),
-    ("LG C4 65in OLED evo TV", "LG", "tv", "flagship", 179900,
-     ["oled", "4k", "gaming", "hdr"],
-     "65in OLED · 144Hz · 4x HDMI 2.1 · Dolby Vision",
-     "Perfect blacks and per-pixel contrast, the reference choice for a dark room."),
-    ("Hisense U6N 55in Mini-LED TV", "Hisense", "tv", "entry", 54900,
-     ["mini-led", "4k", "budget", "hdr"],
-     "55in mini-LED · 60Hz · Dolby Vision",
-     "Genuine mini-LED backlighting and Dolby Vision at an entry-level price."),
-    ("Valve Steam Deck OLED 1TB", "Valve", "gaming", "flagship", 64900,
-     ["handheld", "pc-gaming", "portable"],
-     "7.4in HDR OLED 90Hz · 1TB · SteamOS",
-     "A full PC that plays your existing library on a train."),
-    ("Logitech G Pro X Superlight 2", "Logitech", "gaming", "mid", 15900,
-     ["mouse", "wireless", "esports", "lightweight"],
-     "60g · 32K DPI · 95h battery · USB-C",
-     "Sixty grams with no perceptible wireless latency."),
+    ("Deep Learning Specialization", "DeepLearning.AI", "ai-ml", "advanced", 5900,
+     ["deep-learning", "neural-networks", "tensorflow", "cnn"],
+     "5 courses · 3 months at 10h/week · TensorFlow",
+     "Builds neural networks from the ground up before touching a framework, then covers convolutional and sequence models."),
+    ("Natural Language Processing with Transformers", "O'Reilly", "ai-ml", "advanced", 8900,
+     ["nlp", "transformers", "huggingface", "fine-tuning"],
+     "11 chapters · ~30h · Hugging Face",
+     "Attention, tokenisation, fine-tuning and distillation, worked through the Hugging Face stack."),
+    ("Machine Learning Specialization", "DeepLearning.AI", "ai-ml", "beginner", 4900,
+     ["machine-learning", "python", "supervised-learning", "regression"],
+     "3 courses · 2 months at 10h/week · Python",
+     "Linear and logistic regression, neural networks and clustering, with the maths kept to what you need."),
+    ("Practical Deep Learning for Coders", "fast.ai", "ai-ml", "intermediate", 0,
+     ["deep-learning", "pytorch", "computer-vision", "nlp"],
+     "8 lessons · ~40h · PyTorch and fastai",
+     "Top-down teaching: you train a working image classifier in lesson one, then peel back the layers."),
+    ("Total TypeScript", "Matt Pocock", "web-dev", "advanced", 24900,
+     ["typescript", "types", "generics", "javascript"],
+     "20h+ · interactive exercises · 200+ challenges",
+     "Type-level programming taught as puzzles you solve in your editor: generics and conditional types."),
+    ("Complete Intro to React", "Frontend Masters", "web-dev", "intermediate", 3900,
+     ["react", "javascript", "hooks", "frontend"],
+     "8h video · builds one app throughout",
+     "React taught by building a single application from an empty folder, with no scaffolding to hide the wiring."),
+    ("Data Engineering Zoomcamp", "DataTalks.Club", "data", "advanced", 0,
+     ["data-engineering", "dbt", "airflow", "spark"],
+     "9 weeks · Docker, dbt, Airflow, Spark",
+     "A full pipeline built week by week: ingestion, warehousing, transformation, orchestration and streaming."),
+    ("SQL for Data Analysis", "Udacity", "data", "beginner", 7900,
+     ["sql", "postgres", "joins", "window-functions"],
+     "4 weeks · PostgreSQL · query workspace",
+     "Joins, aggregations, subqueries and window functions, practised against a real transactional database."),
+    ("Offensive Security Certified Professional", "OffSec", "security", "advanced", 164900,
+     ["pentesting", "certification", "exploitation", "reporting"],
+     "PEN-200 · 90 days lab access · 24h exam",
+     "The practical penetration testing certification: a 24-hour hands-on exam against machines you must compromise."),
+    ("Practical Ethical Hacking", "TCM Security", "security", "beginner", 3000,
+     ["pentesting", "linux", "networking", "active-directory"],
+     "25h video · lab environment · certificate",
+     "Networking and Linux fundamentals first, then reconnaissance and exploitation in a lab you build yourself."),
 ]
 
 # Names the tests refer to, kept as constants so a catalogue edit is a one-line change.
-FLAGSHIP_AUDIO = "Sony WH-1000XM5 Wireless Headphones"
-SECOND_AUDIO = "Bose QuietComfort Ultra Headphones"
-ENTRY_AUDIO = "Anker Soundcore Q30 Headphones"
-MID_AUDIO = "Apple AirPods Pro 2 (USB-C)"
-MID_PHONE = "Google Pixel 8a 128GB"
-ENTRY_TV = "Hisense U6N 55in Mini-LED TV"
-FLAGSHIP_TV = "LG C4 65in OLED evo TV"
-FLAGSHIP_GAMING = "Valve Steam Deck OLED 1TB"
+ADVANCED_AI = "Deep Learning Specialization"
+SECOND_AI = "Natural Language Processing with Transformers"
+BEGINNER_AI = "Machine Learning Specialization"
+MID_AI = "Practical Deep Learning for Coders"
+MID_WEB = "Complete Intro to React"
+BEGINNER_DATA = "SQL for Data Analysis"
+ADVANCED_DATA = "Data Engineering Zoomcamp"
+ADVANCED_SECURITY = "Offensive Security Certified Professional"
 
 _VOLATILE = [
     RecommendationItem, Recommendation, AgentRun, Notification, Event, UserProfile, User,

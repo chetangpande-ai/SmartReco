@@ -1,4 +1,4 @@
-"""Product writes. Every mutation lands in SQL and the vector outbox in one commit.
+"""Catalogue writes. Every mutation lands in SQL and the vector outbox in one commit.
 
 The invariant this file maintains: **the vector index contains exactly the published
 products, and nothing else.** Unpublishing enqueues a delete rather than setting a flag

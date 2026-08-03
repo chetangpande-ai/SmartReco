@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}{{ 'Edit' if product else 'New' }} product — SmartReco admin{% endblock %}
+{% block title %}{{ 'Edit' if product else 'New' }} course — SmartReco admin{% endblock %}
 
 {% block content %}
 <div class="admin-head">
-  <h1>{{ 'Edit product' if product else 'New product' }}</h1>
+  <h1>{{ 'Edit course' if product else 'New course' }}</h1>
   <nav class="admin-nav"><a class="nav-link" href="/admin/products">Back to catalogue</a></nav>
 </div>
 
@@ -14,16 +14,16 @@
   <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
 
   <div class="form-row">
-    <label>Product name
+    <label>Course title
       <input type="text" name="title" required minlength="3" maxlength="200"
              value="{{ product.title if product else '' }}">
     </label>
-    <label>Brand
+    <label>Provider
       <input type="text" name="brand" value="{{ product.brand if product else '' }}">
     </label>
   </div>
 
-  <label>Spec line <small class="muted">short, separated by ·</small>
+  <label>Syllabus line <small class="muted">short, separated by ·</small>
     <input type="text" name="spec" maxlength="200"
            placeholder="30h battery · adaptive ANC · Bluetooth 5.2 · 250g"
            value="{{ product.spec if product else '' }}">
@@ -37,13 +37,13 @@
   </label>
 
   <div class="form-row">
-    <label>Category
+    <label>Track
       <input type="text" name="category" required placeholder="audio, phones, laptops…"
              value="{{ product.category if product else '' }}">
     </label>
-    <label>Tier
+    <label>Level
       <select name="tier">
-        {% for t in ['entry', 'mid', 'flagship'] %}
+        {% for t in ['beginner', 'intermediate', 'advanced'] %}
           <option value="{{ t }}" {{ 'selected' if product and product.tier == t else '' }}>{{ t }}</option>
         {% endfor %}
       </select>
@@ -71,6 +71,6 @@
     Published — unpublishing removes it from the vector store as well
   </label>
 
-  <button class="btn btn-primary" type="submit">{{ 'Save changes' if product else 'Create product' }}</button>
+  <button class="btn btn-primary" type="submit">{{ 'Save changes' if product else 'Create course' }}</button>
 </form>
 {% endblock %}

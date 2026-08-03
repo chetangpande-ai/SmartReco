@@ -7,7 +7,7 @@
   <nav class="admin-nav">
     <a class="nav-link" href="/admin">Operations</a>
     <a class="nav-link" href="/admin/agent-runs">Agent runs</a>
-    <a class="btn btn-primary" href="/admin/products/new">Add product</a>
+    <a class="btn btn-primary" href="/admin/products/new">Add course</a>
   </nav>
 </div>
 
@@ -16,14 +16,14 @@
 </form>
 
 <p class="muted">
-  The <strong>vector</strong> column reflects the dual-write: a product is only searchable by
+  The <strong>vector</strong> column reflects the dual-write: a course is only searchable by
   the agent once its outbox row has been drained into the vector store.
 </p>
 
 <div class="table-scroll">
 <table class="data">
   <thead>
-    <tr><th>Product</th><th>Category</th><th>Tier</th><th class="num">Price</th>
+    <tr><th>Course</th><th>Track</th><th>Level</th><th class="num">Price</th>
         <th class="num">Rating</th><th>Published</th><th>Vector</th><th></th></tr>
   </thead>
   <tbody>
@@ -31,7 +31,7 @@
     <tr>
       <td><a href="/products/{{ p.slug }}">{{ p.title }}</a>
           <div class="mono small muted">{{ p.brand }} · {{ p.slug }}</div></td>
-      <td>{{ p.category.replace('-', ' ') }}</td>
+      <td>{{ p.category|track }}</td>
       <td><span class="pill pill-{{ p.tier }}">{{ p.tier }}</span></td>
       <td class="num">{{ p.price_cents|money }}</td>
       <td class="num">{{ '%.1f'|format(p.rating) }}</td>
@@ -51,7 +51,7 @@
       </td>
     </tr>
   {% else %}
-    <tr><td colspan="8" class="muted">No products match.</td></tr>
+    <tr><td colspan="8" class="muted">No courses match.</td></tr>
   {% endfor %}
   </tbody>
 </table>

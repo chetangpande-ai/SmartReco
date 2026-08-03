@@ -1,11 +1,11 @@
 # SmartReco
 
-**A behavioural AI recommendation agent for a consumer electronics store.**
+**A behavioural AI recommendation agent for an online learning platform.**
 
-It watches how each shopper actually behaves, reasons over that behaviour with a
-LangGraph agent, retrieves matching products from a vector database, and writes a
-persuasive recommendation that is *grounded in real stock* and *checked for honesty*
-before anyone sees it.
+It watches how each learner actually behaves, reasons over that behaviour with a
+LangGraph agent, retrieves matching courses from a vector database, and writes a
+persuasive recommendation that is *grounded in the real catalogue* and *checked for
+honesty* before anyone sees it.
 
 ```
 ┌──────────────────────────────── BROWSER ─────────────────────────────────────┐
@@ -39,6 +39,43 @@ before anyone sees it.
 
 ---
 
+## Key features
+
+**Behaviour capture that cannot slow the page down**
+- Twelve signal types: `page_view` · `product_view` · `product_click` · `search` · `search_result_click` · `filter` · `scroll_depth` (25/50/75/100) · `dwell` · `wishlist` · `enroll` · `rec_impression` · `rec_click` — a click *from search results* is a different, higher-intent event than a click from a browse tile, and is weighted accordingly
+- Batched at 20 events or 5 s; scroll throttled, search debounced; `sendBeacon` on unload so the final dwell is never lost
+- **p50 3.0 ms** for a page's worth of events — less than rendering the page itself
+- `localStorage` spill-over retries through 429s and 5xx; every event carries an idempotency key
+
+**A catalogue that cannot silently diverge**
+- **Transactional outbox**: the row and its sync intent commit together, so an outage is a delay, not divergence
+- Hourly `reconcile()` diffs SQL against the index by content hash and repairs `missing`, `stale` and `orphaned` drift — all three verified live on **both** vector backends
+- Unpublishing enqueues a delete, so the index holds *exactly* the published courses
+
+**An agent that reasons, not a template**
+- **LangGraph**: 9 nodes, 4 conditional edges, a bounded refine loop (≤2) and a repair loop (×1)
+- Hybrid retrieval — vector kNN ⊕ BM25 → **RRF** → metadata filters → **MMR** → LLM re-rank
+- **recall@1 0.95 · recall@5 1.00 · MRR 0.975** over 20 paraphrase probes
+- **Groundedness verifier**: a recommended id that was never offered is dropped and the draft repaired
+
+**Copy that is persuasive *and* checkable**
+- Cites only `evidence()` — concrete facts about what the learner actually did, shown to them as "Why these?"
+- **36 deterministic checks** — 31 regex rails plus discount, catalogue-price, PII and length cross-checks — block job guarantees, invented statistics, fake scarcity and prices that aren't in the catalogue. Always on, free, offline, in CI
+- Returns **fewer** than `REC_TOP_K` rather than padding with a filler
+
+**Spending that is deliberate**
+- **11 trigger gates**, cheapest-first, each recording why it skipped
+- Cache keyed on the *ranked order* of interests, not raw scores — scores drift on every event, order does not
+- Daily USD budget, per-user daily cap, circuit breaker, embedding cache (re-seeding costs **$0**)
+
+**Operable**
+- **LangSmith** traces the graph with Mesh calls nested as real `llm` runs; **Logfire** traces the request around it; one run reaches both through LangSmith's OTel bridge — all verified against live projects
+- `/admin` shows sync health, LLM calls avoided and why, the compiled graph, and every run's node path, tokens, cost and latency
+- APScheduler daily digest, idempotent per `digest:<user>:<date>`
+- **312 tests**, 90% coverage, hermetic and free — `LLM_ENABLED=false` runs everything offline
+
+---
+
 ## Quickstart
 
 ```bash
@@ -52,7 +89,7 @@ make run                      # http://localhost:8000
 | Sign in as | Email | Password |
 |---|---|---|
 | admin | `admin@smartreco.dev` | `admin12345` |
-| shopper | `shopper@smartreco.dev` | `shopper12345` |
+| learner | `learner@smartreco.dev` | `learner12345` |
 
 **It also runs with no API key at all.** Set `LLM_ENABLED=false` and the app uses a
 deterministic embedder and template-based copy — every feature works, nothing is
@@ -60,7 +97,7 @@ mocked out, and it spends nothing. That's the mode the whole test suite runs in.
 
 ### See it work
 
-1. Browse a few pairs of headphones, search for something, scroll, sit on a product
+1. Browse a few machine-learning courses, search for something, scroll, sit on a course
    page for a minute.
 2. Open **`/me`** — the agent reads that behaviour and writes a recommendation.
    The *"Why these?"* panel lists the only facts it was allowed to cite.
@@ -68,9 +105,10 @@ mocked out, and it spends nothing. That's the mode the whole test suite runs in.
    agent graph, and every run with its node path, tokens, cost and latency.
 4. Press **"Run digest now"** — the daily email renders to `data/outbox/*.html`.
 
-The catalogue is 35 real products across audio, phones, laptops, cameras, TVs, smart
-home, gaming and wearables — deliberately recognisable, so you can judge for yourself
-whether a recommendation makes sense instead of taking it on trust.
+The catalogue is 35 real courses across AI/ML, web dev, data, cloud, security, design,
+product and career — from Andrew Ng's specialisations to Karpathy's Zero to Hero to
+OSCP. Deliberately recognisable, so you can judge for yourself whether a recommendation
+makes sense instead of taking it on trust.
 
 ---
 
@@ -89,12 +127,12 @@ users ─┬─1:1─ user_profiles
        └─1:N─ notifications
 ```
 
-### 2. Product management with dual-write
+### 2. Catalogue management with dual-write
 
 Admin CRUD at `/admin/products`. The write is **not** a best-effort double write — it
 is a **transactional outbox**:
 
-1. Saving a product writes the `products` row **and** a `vector_outbox` row in **one
+1. Saving a course writes the `products` row **and** a `vector_outbox` row in **one
    commit**. Atomic.
 2. A worker drains the outbox: embed → upsert → stamp `vector_synced_at`.
 3. Failures retry with exponential backoff + jitter, then dead-letter after 5 attempts.
@@ -113,14 +151,14 @@ Three drift classes are tested by injecting each fault — **on both backends, l
 | Ghost vector with no SQL row | `orphaned` | ✅ |
 | Vector's `content_hash` tampered | `stale` | ✅ |
 
-**The invariant:** the index contains *exactly* the published products. Unpublishing
+**The invariant:** the index contains *exactly* the published courses. Unpublishing
 enqueues a delete rather than setting a flag retrieval must remember to filter on.
 
 ### 3. Behavioural event tracking
 
 `tracker.js` — ~230 lines, no dependencies. Captures `page_view`, `product_view`,
 `product_click`, `search`, `filter`, `scroll_depth` (25/50/75/100), `dwell`,
-`add_to_cart`, `purchase`, `rec_impression`, `rec_click`.
+`wishlist`, `enroll`, `rec_impression`, `rec_click`.
 
 **Non-blocking by construction:**
 
@@ -143,7 +181,7 @@ enqueues a delete rather than setting a flag retrieval must remember to filter o
 |---|---|---|---|
 | 1 event | 2.7 ms | 4.1 ms | 6.4 ms |
 | 10 events (one page's worth) | 3.0 ms | 4.4 ms | 21.2 ms |
-| a product page render, for scale | 5.5 ms | 13.6 ms | — |
+| a course page render, for scale | 5.5 ms | 13.6 ms | — |
 
 The beacon costs less than rendering the page it is reporting on. Three identical
 replays → `persisted: 6, duplicates: 2` from a batch of 8.
@@ -171,7 +209,7 @@ START → analyze → plan ─┬─▶ coldstart ──────────
 | `retrieve` | — | vector ⊕ BM25 → RRF → filter → MMR |
 | `grade` | **fast** | LLM-as-judge on retrieval quality **and** re-rank, in one call |
 | `refine` | — | reword the query, widen filters, retry |
-| `generate` | **main** | persuasive JSON: headline, narrative, per-product reasons |
+| `generate` | **main** | persuasive JSON: headline, narrative, per-course reasons |
 | `verify` | — | groundedness + honesty gate |
 | `finalize` | — | fall back to honest copy rather than ship something wrong |
 
@@ -188,30 +226,33 @@ inputs adds latency, cost and a failure mode for no accuracy gain. The nodes tha
 Repair is bounded to **one** attempt. An unbounded loop against a model repeating the
 same mistake burns budget without converging.
 
-**Tier as an upgrade signal.** Products carry `entry | mid | flagship`. A shopper
-consistently opening flagship models is not shopping the entry shelf, so retrieval
-filters accordingly — the same progression logic that makes the copy able to say
-*"you've been looking at the top of this category"* rather than just *"here's something
-similar"*.
+**Level as a progression signal.** Courses carry `beginner | intermediate | advanced`.
+A learner consistently opening advanced material has outgrown the introductory shelf, so
+retrieval spans their level and the next rung up — which is exactly what someone learning
+wants recommended, and what lets the copy say *"this picks up where that left off"*
+rather than just *"here's something similar"*.
 
-**Is it actually personalised, or a popular list with better prose?** Three shoppers,
+**Is it actually personalised, or a popular list with better prose?** Three learners,
 same catalogue, different histories, run against the live gateway:
 
-| | picks shared with the popularity baseline | with each other |
+| | shared with the popularity baseline | with each other |
 |---|---|---|
-| browsed cameras, searched *"mirrorless camera for travel"* | 1 / 4 | — |
-| browsed gaming + TVs, searched *"4k 120hz gaming tv"* | 0 / 4 | 0 / 4 |
-| browsed wearables, searched *"running watch with gps"* | 0 / 4 | 0 / 4 |
+| beginner, browsed AI/ML, searched *"learn machine learning from scratch"* | 1 / 4 | — |
+| advanced, browsed security, searched *"penetration testing certification"* | 1 / 4 | 0 / 4 |
+| career-switcher, browsed data, searched *"sql for analysts"* | 0 / 4 | 0 / 4 |
 
-No two shoppers were shown the same product. The copy tracks the behaviour too, citing
-what they actually did:
+No two learners were shown the same course, and each got material at **their** level —
+the beginner got Andrew Ng, the advanced learner got OSCP first. The copy tracks the
+behaviour too:
 
-> **You've shown a strong interest in the Oura Ring Gen 4 Silver and Garmin Forerunner
-> 265 Music while searching for a sleep tracking ring and running watch with GPS.**
+> **You've been exploring data courses, particularly focusing on SQL and analytics. The
+> Google Data Analytics Certificate directly aligns with your goal of building a
+> portfolio for a career change in data.**
 
-The camera shopper's run also exercised the refine loop for real —
-`analyze → plan → retrieve → grade → refine → retrieve → grade → generate → verify →
-finalize`, $0.000676.
+The security learner's run exercised the refine loop **twice** —
+`analyze → plan → retrieve → grade → refine → retrieve → grade → refine → retrieve →
+grade → generate → verify → finalize`, $0.000691. The career-switcher was shown **two**
+courses, not four: only two genuinely fit, so the agent stopped.
 
 ### 5. Efficiency and production thinking
 
@@ -285,23 +326,30 @@ Default is `gpt-4o-mini`; switch `MESHAPI_MODEL` to `kimi-k3` for a demo recordi
 ### Retrieval floor — swept, not guessed
 
 A kNN index returns *k* results whether or not any are near. With `k=40` over a
-35-product catalogue that is nearly the whole catalogue, so those ranks are noise that
-dilutes rank fusion. Sweeping the floor over 20 paraphrase probes (`make sweep`):
+35-course catalogue that is nearly everything, so those ranks are noise that dilutes rank
+fusion. Sweeping the floor over 20 paraphrase probes (`make sweep`):
 
-| ratio | recall@3 | recall@5 | MRR | avg pool |
+| ratio | recall@1 | recall@5 | MRR | avg pool |
 |---|---|---|---|---|
-| 0.00 | 0.85 | 0.90 | 0.863 | 30.1 |
-| 0.35 | 0.85 | 0.90 | 0.863 | 24.2 |
-| 0.50 | 0.85 | 1.00 | 0.882 | 12.4 |
-| **0.55** | **0.95** | **1.00** | **0.896** | **9.2** |
-| 0.65 | 1.00 | 1.00 | 0.917 | 5.0 |
-| 0.80 | 1.00 | 1.00 | 0.917 | 2.5 |
+| 0.00 | 0.95 | 1.00 | 0.975 | 32.8 |
+| 0.35 | 0.95 | 1.00 | 0.975 | 26.0 |
+| 0.50 | 0.95 | 1.00 | 0.975 | 13.3 |
+| **0.55** | **0.95** | **1.00** | **0.975** | **10.0** |
+| 0.60 | 0.95 | 1.00 | 0.975 | 7.5 |
+| 0.80 | 0.95 | 1.00 | 0.975 | 1.9 |
 
-Recall *improves* as the floor tightens — the opposite of the usual precision/recall
-trade, and only explicable once you notice the pool was the whole catalogue. `0.55`
-takes most of the gain while leaving MMR a pool worth diversifying over; past 0.65 the
-vector side nearly vanishes and BM25 is effectively deciding alone. Tuned on one
+Quality is **flat** across the entire range: the fused ranking is already right, so the
+floor is not a quality knob here at all — it decides how much noise MMR has to
+diversify over. `retrieve` asks for 8 candidates, so `0.55` (pool 10) leaves a real
+choice while `0.60` and tighter starves it below what was requested. Tuned on one
 catalogue of 35 items — re-run `make sweep` if yours differs.
+
+**The probes needed fixing before the numbers meant anything.** A first draft described
+teaching styles with no subject — *"get something working in week one and explain it
+afterwards"* — and scored recall@1 **0.50**. Vector-only inspection showed the best hit
+at similarity 0.29: a sentence about pedagogy matches every course equally. That was
+measuring the probes, not the retrieval. Rewritten to name the subject while still
+avoiding the course's title words, recall@1 went to **0.95**.
 
 ### RRF fuses by rank, never by score
 
@@ -318,27 +366,35 @@ deterministic rails block outcome promises, fabricated urgency, invented discoun
 **any price not in the catalogue**, unsupported superlatives, and PII. They run always,
 free, offline and in CI.
 
-**Real products raise a second risk.** A model recognises the Sony WH-1000XM5 and will
-happily recite specifications from training data that may be wrong or years stale. The
-generation prompt therefore states that catalogue facts are the *only* facts it may
-use, and the `spec` field exists so there is always something accurate to quote.
+**Real courses raise a second risk.** A model recognises the Deep Learning
+Specialization and will happily recite a syllabus from training data that may be wrong or
+years stale. The generation prompt therefore states that catalogue facts are the *only*
+facts it may use, and the `spec` field exists so there is always something accurate to
+quote.
 
-**A store invites a different set of inventions than a course does.** The catalogue has
-a title, brand, category, tier, price, rating, tags and a spec line — no stock level, no
-shipping, no warranty, no price history. So "in stock", "ships today", "free delivery",
-"3-year warranty", "lowest price ever", "on sale" are all unsupported *by construction*,
-and all of them are phrases a model reaches for unprompted when told to sell. Eleven
-rails cover them, alongside a test that ordinary persuasive copy still passes — an
-over-broad rail that blocks honest writing is the same bug in the other direction.
+**Education invites a specific set of inventions.** The catalogue has a title, provider,
+track, level, price, rating, tags and a syllabus line — no accreditation, no placement
+data, no cohort dates, no completion statistics. So "job guarantee", "93% of graduates
+find work", "accredited", "recognised by employers", "seats are filling", "1-on-1
+mentoring" are unsupported *by construction*, and every one is a phrase a model reaches
+for unprompted, because its training data on course marketing is saturated with them.
+
+The reverse error matters just as much. One syllabus line genuinely says **"lifetime
+access"** — a rail on that phrase would reject the model for quoting the catalogue
+correctly. The rails forbid only what the catalogue cannot support, never what it does,
+and a test pins both directions.
 
 ### Recommending fewer than four
 
-Retrieval always returns a full slate, so a narrow interest — the catalogue holds three
-wearables — gets padded with whatever fused in behind them. An A/B run caught it live: a
-fitness shopper's fourth pick was a video doorbell, reasoned as "in case you're looking
-for more tech at home". Honest, grounded, and exactly what makes a recommender feel
-generic. The generation prompt now asks for *up to* `REC_TOP_K` and says plainly that
-three products someone would consider beats four with a filler in it.
+Retrieval always returns a full slate, so a narrow interest gets padded with whatever
+fused in behind it. An A/B run caught it live on the previous catalogue: a fitness
+shopper's fourth pick was a video doorbell, reasoned as *"in case you're looking for more
+tech at home"*. Honest, grounded, and exactly what makes a recommender feel generic.
+
+The generation prompt now asks for *up to* `REC_TOP_K` and says plainly that three
+courses someone would actually take beats four with a filler. Verified on the current
+catalogue: the career-switching learner was shown **two** courses, because only two
+genuinely fit a beginner moving into data.
 
 ### Observability: two views, one run
 
@@ -395,7 +451,7 @@ without reading logs — the question you ask once the demo is already running.
 ## Testing
 
 ```bash
-make test     # 309 tests, offline, no API key, spends nothing
+make test     # 312 tests, offline, no API key, spends nothing
 make cov      # coverage report (83%)
 make eval     # retrieval quality against 20 paraphrase probes
 ```
@@ -404,7 +460,7 @@ make eval     # retrieval quality against 20 paraphrase probes
 |---|---|
 | `test_unit.py` | passwords, JWT, CSRF, JSON extraction, guardrails, BM25, RRF, MMR |
 | `test_mesh.py` | Mesh gateway against a stub: retries, breaker, budget, parameter negotiation, the empty-completion trap |
-| `test_storage.py` | embedding cache, vector stores, dual-write, outbox retry + dead-letter, all three drift classes |
+| `test_storage.py` | embedding cache, both vector backends, dual-write, outbox retry + dead-letter, all three drift classes |
 | `test_pipeline.py` | ingest, dedupe, decay, evidence, drift, signature, **all 11 trigger gates** |
 | `test_agent.py` | graph shape, groundedness verifier, repair bounding, end-to-end |
 | `test_digest.py` | audience, rendering, once-only delivery, SMTP send path, scheduler |
@@ -412,7 +468,7 @@ make eval     # retrieval quality against 20 paraphrase probes
 | `test_observability.py` | sink selection, the OTel bridge, and the two silent failure modes below |
 
 Several tests are explicitly labelled regressions for bugs found during the build — an
-unpublished product staying recommendable, a search-only shopper getting no interest
+unpublished course staying recommendable, a search-only learner getting no interest
 signal, duplicate texts being embedded twice in one batch, error pages returning 200.
 
 ---
@@ -426,7 +482,7 @@ Everything is in `.env` (see `.env.example`). The knobs that matter most:
 | `LLM_ENABLED` | `true` | `false` runs the whole app offline for $0 |
 | `LLM_DAILY_BUDGET_USD` | `1.00` | Hard spend cap across all callers |
 | `REC_MIN_EVENTS` | `5` | Events before a recommendation is considered |
-| `REC_COOLDOWN_SECONDS` | `90` | Floor between runs for one shopper |
+| `REC_COOLDOWN_SECONDS` | `90` | Floor between runs for one learner |
 | `REC_DRIFT_THRESHOLD` | `0.10` | Interest change needed to justify a call |
 | `RETRIEVAL_SCORE_RATIO` | `0.55` | Relevance floor, relative to the best hit |
 | `VECTOR_BACKEND` | `chroma` | or `pinecone` |
@@ -480,7 +536,7 @@ and the stubs had agreed with every one of them:
 |---|---|---|
 | An existing index of the wrong dimension was reused | The stub only ever created a fresh index | Every upsert fails inside the outbox worker, minutes later, dead-lettering the catalogue |
 | `reset()` 404s on a namespace that does not exist yet | The stub's `delete` never raised | `reindex_all()` — the *first* thing a new setup runs — crashes |
-| `all_hashes()` iterated `list()` as if it yielded id strings | The stub returned what the code expected, not what the SDK returns | Returned `{}`, so reconcile saw all 35 products as `missing` and re-upserted hourly forever, while `stale` and `orphaned` could never be detected — a no-op that looked like a repair |
+| `all_hashes()` iterated `list()` as if it yielded id strings | The stub returned what the code expected, not what the SDK returns | Returned `{}`, so reconcile saw all 35 courses as `missing` and re-upserted hourly forever, while `stale` and `orphaned` could never be detected — a no-op that looked like a repair |
 
 All three are fixed, each with a regression test whose stub now models the *real* shape.
 Verified live afterwards: 35 vectors indexed from the embedding cache for **$0**, the
@@ -498,16 +554,17 @@ no signup — but the production path is now a path someone has actually walked.
 - **The budget gate is checked before a call**, so a single call can overshoot the cap;
   cost is only knowable afterwards. The guarantee is that spending *stops* once the
   limit is crossed, not that it never crosses it.
-- **Retrieval is tuned on 20 probes against 35 products.** recall@1 0.85, recall@5 1.00,
-  MRR 0.896 — good, but a 35-item catalogue is small enough that these numbers would
-  need re-establishing at real scale. The two hardest probes both confuse two Sonos
-  speakers with each other, which is a genuinely fine distinction.
-- **Product names and specs are real, prices and ratings are illustrative.** This is a
-  demo storefront, not a price comparison service.
-- **Product imagery is generated, not photographed.** Real product photography belongs
-  to the manufacturers, so each card renders a category glyph on a hue derived from the
-  product slug — deterministic, zero third-party requests, and compatible with the
-  strict CSP. It reads as a design choice rather than a missing asset.
+- **Retrieval is tuned on 20 probes against 35 courses.** recall@1 0.95, recall@5 1.00,
+  MRR 0.975 — but a 35-item catalogue is small enough that these numbers would need
+  re-establishing at real scale, where several near-identical deep-learning courses
+  would be competing rather than one.
+- **Course names, providers and syllabus lines are real; prices and ratings are
+  illustrative.** This is a demo platform, not a live marketplace, and no course listed
+  here is affiliated with it.
+- **Course artwork is generated, not licensed.** Real course thumbnails belong to their
+  providers, so each card renders a track glyph on a hue derived from the slug —
+  deterministic, zero third-party requests, and compatible with the strict CSP. It reads
+  as a design choice rather than a missing asset.
 
 ---
 

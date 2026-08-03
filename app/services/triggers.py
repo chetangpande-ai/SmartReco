@@ -34,10 +34,6 @@ class Decision:
     drift: float = 0.0
     signature: str = ""
 
-    @property
-    def served_from_cache(self) -> bool:
-        return self.cached is not None
-
 
 def current_recommendation(db: Session, user_id: int) -> Recommendation | None:
     return db.scalar(

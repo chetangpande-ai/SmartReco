@@ -1,0 +1,72 @@
+name: SmartReco Checks
+
+on: [push]
+
+permissions:
+  id-token: write      # required — without this the OIDC env vars do not exist
+  contents: read
+
+# A newer push supersedes an older run. The server also rejects stale runs by run_id,
+# but cancelling here saves runner minutes.
+concurrency:
+  group: smartreco-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Where the API actually lives. This is the only value that changes between environments.
+  API_BASE: https://careerapi-staging.krishnaik.in
+  # Opaque identifier stamped into the OIDC token. NOT a URL that gets fetched, and NOT
+  # environment-specific — the server accepts this exact string everywhere. Do not change it.
+  OIDC_AUDIENCE: https://career.krishnaik.in
+  HACKATHON: smartreco-build-challenge-2026
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # No extra dependencies: these checks use only the Python standard library.
+
+      - name: Request GitHub OIDC token
+        id: oidc
+        run: |
+          TOKEN=$(curl -sS \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=${{ env.OIDC_AUDIENCE }}" \
+            | jq -r '.value')
+          if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+            echo "::error::Could not get an OIDC token. Check 'permissions: id-token: write'."
+            exit 1
+          fi
+          echo "::add-mask::$TOKEN"
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+
+      - name: Download checks
+        env:
+          OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
+          SUBMISSION_TOKEN: ${{ secrets.SUBMISSION_TOKEN }}
+        run: |
+          # The script is served only to GitHub Actions, and only for the hackathon this
+          # token is registered for. Print the server's reason on failure instead of a
+          # bare exit code.
+          HTTP=$(curl -sS -o checks.py -w '%{http_code}' \
+            -H "Authorization: Bearer $OIDC_TOKEN" \
+            -H "X-Submission-Token: $SUBMISSION_TOKEN" \
+            "$API_BASE/api/ci/hackathons/$HACKATHON/checks.py")
+          if [ "$HTTP" != "200" ]; then
+            echo "::error::Could not download checks (HTTP $HTTP): $(cat checks.py)"
+            exit 1
+          fi
+
+      - name: Run checks
+        env:
+          WEBHOOK_URL: ${{ env.API_BASE }}/api/ci/report
+          SUBMISSION_TOKEN: ${{ secrets.SUBMISSION_TOKEN }}
+          OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
+          MESH_API_KEY: ${{ secrets.MESH_API_KEY }}
+        run: python checks.py

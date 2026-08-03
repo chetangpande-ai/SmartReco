@@ -80,9 +80,9 @@ class Product(Base):
     title: Mapped[str] = mapped_column(String(200))
     description: Mapped[str] = mapped_column(Text, default="")
     category: Mapped[str] = mapped_column(String(80), index=True)
-    # entry | mid | flagship — the upgrade ladder the agent reasons about when it
-    # decides whether someone has outgrown the cheap end of a category.
-    tier: Mapped[str] = mapped_column(String(24), default="entry")
+    # beginner | intermediate | advanced — the progression ladder the agent reasons
+    # about when it decides whether someone has outgrown the introductory material.
+    tier: Mapped[str] = mapped_column(String(24), default="beginner")
     tags: Mapped[list] = mapped_column(JSON, default=list)
     price_cents: Mapped[int] = mapped_column(Integer, default=0)
     currency: Mapped[str] = mapped_column(String(3), default="USD")
@@ -110,12 +110,13 @@ class Product(Base):
         return self.vector_synced_at is not None
 
     def embedding_text(self) -> str:
-        """What gets embedded. Title is repeated because it carries the most signal,
-        and brand is included so "sony headphones" matches without an exact title hit."""
+        """What gets embedded. Title is repeated because it carries the most signal, and
+        the provider is included so "deeplearning.ai course" matches without an exact
+        title hit."""
         tags = " ".join(self.tags or [])
         return (
-            f"{self.title}. {self.title}. {self.brand}. Category: {self.category}. "
-            f"Tier: {self.tier}. Features: {tags}. {self.spec}. {self.description}"
+            f"{self.title}. {self.title}. {self.brand}. Track: {self.category}. "
+            f"Level: {self.tier}. Topics: {tags}. {self.spec}. {self.description}"
         )
 
 

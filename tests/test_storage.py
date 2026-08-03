@@ -36,7 +36,7 @@ def product_factory():
     def make(title: str, **kwargs) -> int:
         defaults = {
             "description": f"A course about {title}", "category": "misc",
-            "tier": "entry", "tags": ["test"], "price_cents": 1000,
+            "tier": "beginner", "tags": ["test"], "price_cents": 1000,
         }
         with session_scope() as db:
             product = create_product(db, ProductIn(title=title, **{**defaults, **kwargs}))
@@ -109,7 +109,7 @@ class TestEmbeddingCache:
 class TestFilterTranslation:
     @pytest.fixture
     def full(self):
-        return Filter(categories=["audio"], tiers=["flagship"], max_price_cents=90000,
+        return Filter(categories=["ai-ml"], tiers=["advanced"], max_price_cents=90000,
                       exclude_ids=[7])
 
     def test_chroma_wraps_multiple_clauses_in_and(self, full):
@@ -117,7 +117,7 @@ class TestFilterTranslation:
         assert "$and" in where and len(where["$and"]) == 4
 
     def test_chroma_leaves_a_single_clause_unwrapped(self):
-        assert "category" in ChromaStore._where(Filter(categories=["audio"]))
+        assert "category" in ChromaStore._where(Filter(categories=["ai-ml"]))
 
     def test_pinecone_uses_implicit_and(self, full):
         f = PineconeStore._filter(full)
@@ -173,7 +173,7 @@ class FakeIndex:
         return {
             "matches": [
                 {"id": "7", "score": 0.83,
-                 "metadata": {"title": "Sony WH-1000XM5", "document": "text that rides along",
+                 "metadata": {"title": "Deep Learning Specialization", "document": "text that rides along",
                               "content_hash": "abc"}},
             ]
         }
@@ -299,9 +299,9 @@ class TestPineconeBackend:
 
     def test_query_maps_matches_and_lifts_the_document_out(self, store):
         s, fake = store(exists=True)
-        hits = s.query([0.2] * 8, 3, Filter(tiers=["flagship"]))
+        hits = s.query([0.2] * 8, 3, Filter(tiers=["advanced"]))
         assert fake.queries[0]["top_k"] == 3
-        assert fake.queries[0]["filter"] == {"tier": {"$in": ["flagship"]}}
+        assert fake.queries[0]["filter"] == {"tier": {"$in": ["advanced"]}}
         assert len(hits) == 1
         assert hits[0].id == "7" and hits[0].score == pytest.approx(0.83)
         assert hits[0].document == "text that rides along"
@@ -492,7 +492,7 @@ class TestDualWrite:
 
         base = {"title": "Visibility Course",
                 "description": "A course about Visibility Course",
-                "category": "misc", "tier": "entry", "tags": ["test"],
+                "category": "misc", "tier": "beginner", "tags": ["test"],
                 "price_cents": 1000}
         with session_scope() as db:
             update_product(db, db.get(Product, pid), ProductIn(**base, is_published=False))
@@ -509,7 +509,7 @@ class TestDualWrite:
         outbox.drain_all()
         base = {"title": "Coalesce Course",
                 "description": "A course about Coalesce Course",
-                "category": "misc", "tier": "entry", "tags": ["test"]}
+                "category": "misc", "tier": "beginner", "tags": ["test"]}
         with session_scope() as db:
             for price in (1100, 1200, 1300):
                 update_product(db, db.get(Product, pid), ProductIn(**base, price_cents=price))

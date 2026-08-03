@@ -296,9 +296,9 @@ class TestRunUrlReachesTheDatabase:
         from app.services import recommender
 
         uid = user_factory()
-        pid = catalog["Sony WH-1000XM5 Wireless Headphones"]
+        pid = catalog["Deep Learning Specialization"]
         event_factory(uid, "product_view", product_id=pid, count=6, hours_ago=0.05)
-        event_factory(uid, "search", query="noise cancelling headphones", hours_ago=0.05)
+        event_factory(uid, "search", query="deep learning neural networks", hours_ago=0.05)
         with session_scope() as db:
             P.refresh(db, uid)
 

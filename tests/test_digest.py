@@ -17,9 +17,9 @@ from app.services import profile as P
 @pytest.fixture
 def digest_user(catalog, user_factory, event_factory):
     uid = user_factory("digest@test.local")
-    pid = catalog["Sony WH-1000XM5 Wireless Headphones"]
+    pid = catalog["Deep Learning Specialization"]
     event_factory(uid, "product_view", product_id=pid, count=6, hours_ago=1)
-    event_factory(uid, "search", query="noise cancelling headphones", hours_ago=1)
+    event_factory(uid, "search", query="deep learning neural networks", hours_ago=1)
     with session_scope() as db:
         P.refresh(db, uid)
     recommender.generate_for_user(uid, force=True)
@@ -207,28 +207,28 @@ class TestAudience:
     def test_active_user_included(self, catalog, user_factory, event_factory):
         uid = user_factory()
         event_factory(uid, "product_view",
-                      product_id=catalog["Google Pixel 8a 128GB"], count=6, hours_ago=1)
+                      product_id=catalog["SQL for Data Analysis"], count=6, hours_ago=1)
         with session_scope() as db:
             assert uid in {u.id for u in digest.active_users_today(db)}
 
     def test_below_minimum_events_excluded(self, catalog, user_factory, event_factory):
         uid = user_factory()
         event_factory(uid, "product_view",
-                      product_id=catalog["Google Pixel 8a 128GB"], count=1, hours_ago=1)
+                      product_id=catalog["SQL for Data Analysis"], count=1, hours_ago=1)
         with session_scope() as db:
             assert uid not in {u.id for u in digest.active_users_today(db)}
 
     def test_opted_out_excluded(self, catalog, user_factory, event_factory):
         uid = user_factory(digest_opt_in=False)
         event_factory(uid, "product_view",
-                      product_id=catalog["Google Pixel 8a 128GB"], count=6, hours_ago=1)
+                      product_id=catalog["SQL for Data Analysis"], count=6, hours_ago=1)
         with session_scope() as db:
             assert uid not in {u.id for u in digest.active_users_today(db)}
 
     def test_outside_the_window_excluded(self, catalog, user_factory, event_factory):
         uid = user_factory()
         event_factory(uid, "product_view",
-                      product_id=catalog["Google Pixel 8a 128GB"], count=6, hours_ago=40)
+                      product_id=catalog["SQL for Data Analysis"], count=6, hours_ago=40)
         with session_scope() as db:
             assert uid not in {u.id for u in digest.active_users_today(db)}
 

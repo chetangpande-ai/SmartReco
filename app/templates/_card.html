@@ -3,8 +3,11 @@
 {% macro product_card(p, position=0, source='catalog', impression=false) -%}
 <article class="card"
          {% if impression %}data-track-impression data-product-slug="{{ p.slug }}" data-position="{{ position }}"{% endif %}>
+  {# Clicking a search result means "this is what I meant"; clicking a browse tile means
+     "this caught my eye". The profile weights them 1.8 vs 1.2, so the two have to arrive
+     as different event types or that distinction is thrown away at the source. #}
   <a class="card-link" href="/products/{{ p.slug }}"
-     data-track-click="product_click"
+     data-track-click="{{ 'search_result_click' if source == 'search' else 'product_click' }}"
      data-product-slug="{{ p.slug }}"
      data-position="{{ position }}"
      data-source="{{ source }}">
@@ -12,7 +15,7 @@
     <div class="card-body">
       <div class="card-top">
         <span class="pill pill-{{ p.tier }}">{{ p.tier }}</span>
-        <span class="pill pill-cat">{{ p.category.replace('-', ' ') }}</span>
+        <span class="pill pill-cat">{{ p.category|track }}</span>
       </div>
       <h3 class="card-title">{{ p.title }}</h3>
       {% if p.spec %}<p class="card-spec">{{ p.spec }}</p>{% endif %}

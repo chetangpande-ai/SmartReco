@@ -54,8 +54,8 @@ def verify_state(catalog):
     state = new_state(1, "test", "req", 3)
     state.update(
         candidates=[
-            {"product_id": pid, "title": f"t{pid}", "brand": "Test", "category": "audio",
-             "tier": "flagship", "price_cents": 39900, "rating": 4.5, "spec": "",
+            {"product_id": pid, "title": f"t{pid}", "brand": "Test", "category": "ai-ml",
+             "tier": "advanced", "price_cents": 39900, "rating": 4.5, "spec": "",
              "tags": [], "description": ""}
             for pid in ids
         ],
@@ -147,15 +147,15 @@ class TestEndToEndOffline:
     @pytest.fixture
     def busy_user(self, catalog, user_factory, event_factory):
         uid = user_factory()
-        audio_ids = [
-            catalog["Sony WH-1000XM5 Wireless Headphones"],
-            catalog["Bose QuietComfort Ultra Headphones"],
-            catalog["Apple AirPods Pro 2 (USB-C)"],
+        ai_ids = [
+            catalog["Deep Learning Specialization"],
+            catalog["Natural Language Processing with Transformers"],
+            catalog["Practical Deep Learning for Coders"],
         ]
-        for pid in audio_ids:
+        for pid in ai_ids:
             event_factory(uid, "product_view", product_id=pid, count=3)
-        event_factory(uid, "search", query="noise cancelling headphones", count=2)
-        event_factory(uid, "dwell", product_id=audio_ids[0], dwell_ms=240_000)
+        event_factory(uid, "search", query="deep learning neural networks", count=2)
+        event_factory(uid, "dwell", product_id=ai_ids[0], dwell_ms=240_000)
         with session_scope() as db:
             P.refresh(db, uid)
         return uid

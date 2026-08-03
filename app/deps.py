@@ -42,11 +42,6 @@ def require_admin(user: User = Depends(require_user)) -> User:
     return user
 
 
-def get_anon_id(request: Request) -> str:
-    """Stable id for logged-out visitors so their pre-signup browsing isn't lost."""
-    return request.cookies.get(ANON_COOKIE) or ""
-
-
 def new_anon_id() -> str:
     return uuid.uuid4().hex
 

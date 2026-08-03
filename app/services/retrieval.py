@@ -34,14 +34,19 @@ from app.services.vectorstore import Filter, get_vector_store
 log = logging.getLogger(__name__)
 
 _TOKEN = re.compile(r"[a-z0-9][a-z0-9+#.-]*")
-# Words that carry no discriminating power in a shopping query. The shape of this list
-# is domain-specific: a shopper types "best cheap wireless headphones under 200", and
-# every word except "wireless" and "headphones" matches nothing in the catalogue text
-# while inflating document length in the BM25 denominator.
+# Words that carry no discriminating power in a catalogue query. The shape of this list
+# is domain-specific: a learner types "best free course to learn deep learning", and every
+# word except "deep" and "learning" matches nothing useful while inflating document length
+# in the BM25 denominator. "course", "tutorial" and "learn" appear in almost every record
+# here, which is exactly what makes them worthless as discriminators.
+# Deliberately NOT here: "learning" and "beginner". "learning" is in a third of these
+# titles (Machine Learning, Deep Learning, LinkedIn Learning) and "beginner" is a level
+# the text carries — stopwording either would throw away the strongest lexical signal in
+# the catalogue to remove a word that only *looks* generic.
 STOPWORDS = frozenset(
     "the a an and or for with to of in on at is are be as by from it this that how "
-    "what best top good great cheap buy buying price review reviews vs versus under "
-    "using your you my me i".split()
+    "what best top good great course courses class classes tutorial tutorials lesson "
+    "lessons guide intro introduction using your you my me i".split()
 )
 
 # BM25 constants. k1 controls term-frequency saturation, b how much document length
