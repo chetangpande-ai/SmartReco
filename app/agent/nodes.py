@@ -1,4 +1,4 @@
-"""The eight graph nodes.
+"""The nine graph nodes.
 
 Only two of them spend tokens — `grade` and `generate`. `analyse` is deliberately
 deterministic: turning a behaviour profile into a search query is arithmetic over
@@ -440,10 +440,8 @@ def finalize(state: AgentState) -> dict:
 def _plain_narrative(state: AgentState, picks: list[dict]) -> str:
     facts = state.get("evidence") or []
     lead = f"Based on what you've been studying — {facts[0]}" if facts else "Based on your recent activity"
-    return (
-        f"{lead} — {'these' if len(picks) != 1 else 'this'} {len(picks)} "
-        f"course{'s' if len(picks) != 1 else ''} follow on from that."
-    )
+    tail = "this course follows" if len(picks) == 1 else f"these {len(picks)} courses follow"
+    return f"{lead} — {tail} on from that."
 
 
 def _deterministic_copy(state: AgentState, candidates: list[dict]) -> dict:

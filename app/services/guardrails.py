@@ -131,9 +131,9 @@ def check_copy(
         if match:
             report.add("unsupported_commerce", f"{label} ({match.group(0)!r})")
 
-    if _DISCOUNT.search(text):
+    if discount := _DISCOUNT.search(text):
         # There is no discount field in the catalogue, so any discount is invented.
-        report.add("invented_discount", _DISCOUNT.search(text).group(0))
+        report.add("invented_discount", discount.group(0))
 
     if allowed_prices_cents is not None:
         for match in _PRICE.finditer(text):

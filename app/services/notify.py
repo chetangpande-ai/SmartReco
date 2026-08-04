@@ -108,8 +108,12 @@ def send_once(
     html: str,
     text: str,
     recommendation_id: int | None = None,
-) -> bool:
-    """Send exactly once. Returns True if this call actually delivered.
+) -> str:
+    """Send exactly once. Returns "sent", "duplicate" or "failed".
+
+    Three outcomes rather than a bool because the caller reports them separately: a
+    duplicate is the dedupe key doing its job, a failure is an operator's problem, and
+    collapsing both into False left the digest's failure counter permanently at zero.
 
     The Notification row is written *before* the send and committed, so two concurrent
     workers race on the unique index rather than both mailing the user. Losing that
@@ -129,7 +133,7 @@ def send_once(
     except IntegrityError:
         db.rollback()
         log.info("digest already sent", extra={"user_id": user.id, "key": dedupe_key})
-        return False
+        return "duplicate"
 
     try:
         destination = get_notifier().send(user.email, subject, html, text)
@@ -142,8 +146,8 @@ def send_once(
         notification.error = str(exc)[:400]
         db.commit()
         log.exception("digest send failed", extra={"user_id": user.id})
-        return False
+        return "failed"
 
     db.commit()
     log.info("digest sent", extra={"user_id": user.id, "channel": notification.channel})
-    return True
+    return "sent"

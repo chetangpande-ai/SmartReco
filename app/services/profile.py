@@ -149,9 +149,11 @@ def refresh(db: Session, user_id: int) -> UserProfile | None:
                 f"{r.title}. {r.brand}. {r.category}. {' '.join(r.tags or [])}"
             ] += weight
 
-        if r.type == "search" and r.query:
-            q = r.query.strip()
-            if q and q.lower() not in {x.lower() for x in queries}:
+        # Whitespace-only queries are dropped rather than stripped-and-kept: an empty
+        # string would still be embedded into the centroid, paying for a vector that
+        # describes nothing.
+        if r.type == "search" and (q := (r.query or "").strip()):
+            if q.lower() not in {x.lower() for x in queries}:
                 queries.append(q)
             centroid_inputs[q] += weight
             for tok in tokenize(q):

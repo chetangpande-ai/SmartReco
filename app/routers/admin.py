@@ -33,7 +33,7 @@ def _form_to_product(form) -> ProductIn:
         title=form.get("title", ""),
         description=form.get("description", ""),
         category=form.get("category", "").strip().lower(),
-        tier=form.get("tier", "entry"),
+        tier=form.get("tier", "beginner"),
         tags=[t.strip() for t in form.get("tags", "").split(",") if t.strip()],
         price_cents=int(float(form.get("price", 0) or 0) * 100),
         brand=form.get("brand", ""),

@@ -142,6 +142,28 @@ class TestParameterNegotiation:
         mesh.chat([{"role": "user", "content": "hi"}], max_tokens=500)
         assert "max_completion_tokens" in stub.completions.calls[1]
 
+    def test_the_rename_is_carried_into_later_calls(self, mesh):
+        """Regression: the rejection was remembered as a bare drop.
+
+        The second call popped `max_tokens` and never re-added `max_completion_tokens`,
+        so every call after the first went out with no output ceiling at all — which is
+        precisely the empty-completion trap that setting exists to avoid.
+        """
+        stub = attach(
+            mesh,
+            [
+                _error(BadRequestError, "unsupported parameter: max_tokens"),
+                _response("first"),
+                _response("second"),
+            ],
+        )
+        mesh.chat([{"role": "user", "content": "a"}], model="reasoner/model", max_tokens=500)
+        mesh.chat([{"role": "user", "content": "b"}], model="reasoner/model", max_tokens=500)
+
+        last = stub.completions.calls[-1]
+        assert "max_tokens" not in last
+        assert last["max_completion_tokens"] == 500
+
     def test_an_unrelated_400_is_not_retried(self, mesh):
         stub = attach(mesh, [_error(BadRequestError, "model not found")])
         with pytest.raises(MeshError):

@@ -53,14 +53,14 @@ honesty* before anyone sees it.
 - Unpublishing enqueues a delete, so the index holds *exactly* the published courses
 
 **An agent that reasons, not a template**
-- **LangGraph**: 9 nodes, 4 conditional edges, a bounded refine loop (≤2) and a repair loop (×1)
+- **LangGraph**: 9 nodes and 3 branch points (6 conditional edges), a bounded refine loop (≤2) and a repair loop (×1)
 - Hybrid retrieval — vector kNN ⊕ BM25 → **RRF** → metadata filters → **MMR** → LLM re-rank
 - **recall@1 0.95 · recall@5 1.00 · MRR 0.975** over 20 paraphrase probes
 - **Groundedness verifier**: a recommended id that was never offered is dropped and the draft repaired
 
 **Copy that is persuasive *and* checkable**
 - Cites only `evidence()` — concrete facts about what the learner actually did, shown to them as "Why these?"
-- **36 deterministic checks** — 31 regex rails plus discount, catalogue-price, PII and length cross-checks — block job guarantees, invented statistics, fake scarcity and prices that aren't in the catalogue. Always on, free, offline, in CI
+- **35 deterministic checks** — 31 regex rails plus discount, catalogue-price, PII and length cross-checks — block job guarantees, invented statistics, fake scarcity and prices that aren't in the catalogue. Always on, free, offline, in CI
 - Returns **fewer** than `REC_TOP_K` rather than padding with a filler
 
 **Spending that is deliberate**
@@ -72,7 +72,7 @@ honesty* before anyone sees it.
 - **LangSmith** traces the graph with Mesh calls nested as real `llm` runs; **Logfire** traces the request around it; one run reaches both through LangSmith's OTel bridge — all verified against live projects
 - `/admin` shows sync health, LLM calls avoided and why, the compiled graph, and every run's node path, tokens, cost and latency
 - APScheduler daily digest, idempotent per `digest:<user>:<date>`
-- **312 tests**, 90% coverage, hermetic and free — `LLM_ENABLED=false` runs everything offline
+- **314 tests**, 90% coverage, hermetic and free — `LLM_ENABLED=false` runs everything offline
 
 ---
 
@@ -117,15 +117,21 @@ makes sense instead of taking it on trust.
 ### 1. Platform
 
 Email/password auth (bcrypt cost 12, JWT in an `HttpOnly` cookie, CSRF double-submit),
-two roles, and **10 related tables**:
+two roles, and **10 tables** — nine related, plus a standalone embedding cache:
 
 ```
 users ─┬─1:1─ user_profiles
        ├─1:N─ events ──N:1─ products ─1:N─ vector_outbox
        ├─1:N─ recommendations ─1:N─ recommendation_items ─N:1─ products
-       ├─1:N─ agent_runs        └── embedding_cache
+       ├─1:N─ agent_runs
        └─1:N─ notifications
+
+embedding_cache          keyed by (embedder, text), joined to nothing on purpose
 ```
+
+`embedding_cache` deliberately has no foreign key: vectors are a pure function of the
+model and the text, so a re-seed reuses what was already paid for even when the row that
+first needed them is gone.
 
 ### 2. Catalogue management with dual-write
 
@@ -156,9 +162,9 @@ enqueues a delete rather than setting a flag retrieval must remember to filter o
 
 ### 3. Behavioural event tracking
 
-`tracker.js` — ~230 lines, no dependencies. Captures `page_view`, `product_view`,
-`product_click`, `search`, `filter`, `scroll_depth` (25/50/75/100), `dwell`,
-`wishlist`, `enroll`, `rec_impression`, `rec_click`.
+`tracker.js` — ~290 lines, no dependencies. Captures `page_view`, `product_view`,
+`product_click`, `search`, `search_result_click`, `filter`, `scroll_depth`
+(25/50/75/100), `dwell`, `wishlist`, `enroll`, `rec_impression`, `rec_click`.
 
 **Non-blocking by construction:**
 
@@ -193,7 +199,7 @@ ones alongside it. The rate limiter charges per event and is sized from that: a
 
 ### 4. The agentic recommendation engine
 
-Eight LangGraph nodes. **Only two spend tokens.**
+Nine LangGraph nodes. **Only two spend tokens.**
 
 ```
 START → analyze → plan ─┬─▶ coldstart ────────────┐
@@ -206,6 +212,7 @@ START → analyze → plan ─┬─▶ coldstart ──────────
 |---|---|---|
 | `analyze` | — | profile → search query, metadata filters, citable evidence |
 | `plan` | — | enough signal to retrieve against, or cold start? |
+| `coldstart` | — | no usable behaviour yet: the catalogue's own top-rated, rather than an invented interest |
 | `retrieve` | — | vector ⊕ BM25 → RRF → filter → MMR |
 | `grade` | **fast** | LLM-as-judge on retrieval quality **and** re-rank, in one call |
 | `refine` | — | reword the query, widen filters, retry |
@@ -288,7 +295,7 @@ token-bucket rate limiting; CSP and security headers.
 
 | Bonus | Status |
 |---|---|
-| ⭐ **Structured agent framework** | LangGraph 1.2, 8 nodes, conditional edges, bounded refine + repair loops. `/admin` renders the graph **read from the compiled object**, so it cannot drift from what runs |
+| ⭐ **Structured agent framework** | LangGraph 1.2, 9 nodes, conditional edges, bounded refine + repair loops. `/admin` renders the graph **read from the compiled object**, so it cannot drift from what runs |
 | ⭐ **Scheduled proactive delivery** | APScheduler: digest at 16:00 UTC (with jitter), outbox drain 60 s, reconcile hourly. Idempotent via a unique `digest:<user>:<date>` key |
 | ⭐ **Observability** | **LangSmith** traces the graph (with the Mesh calls nested inside as real `llm` runs), **Logfire** traces the request around it — HTTP, SQL, tokens — and one run reaches both through LangSmith's OTel bridge. **Both live, not just wired.** Plus a durable `agent_runs` table: node path, grade, refines, tokens, cost, latency, trace URL. [Details ↓](#observability-two-views-one-run) |
 | ⭐ **Retrieval polish** | Hybrid vector+BM25 → RRF → metadata filters → MMR → LLM re-rank. Relevance floor **tuned by sweep, not guessed** |
@@ -451,8 +458,8 @@ without reading logs — the question you ask once the demo is already running.
 ## Testing
 
 ```bash
-make test     # 312 tests, offline, no API key, spends nothing
-make cov      # coverage report (83%)
+make test     # 314 tests, offline, no API key, spends nothing
+make cov      # coverage report (90%)
 make eval     # retrieval quality against 20 paraphrase probes
 ```
 
@@ -469,7 +476,8 @@ make eval     # retrieval quality against 20 paraphrase probes
 
 Several tests are explicitly labelled regressions for bugs found during the build — an
 unpublished course staying recommendable, a search-only learner getting no interest
-signal, duplicate texts being embedded twice in one batch, error pages returning 200.
+signal, duplicate texts being embedded twice in one batch, error pages returning 200,
+and the digest's failure counter reporting a clean run while nothing was delivered.
 
 ---
 

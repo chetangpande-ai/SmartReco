@@ -210,7 +210,7 @@ def _cut_weak_hits(hits: list[tuple[int, float]]) -> list[tuple[int, float]]:
     """Drop kNN results that are only there because k had to be filled.
 
     A vector index returns the k nearest neighbours whether or not any of them are
-    actually near. On a 32-product catalogue with k=40 that is the entire catalogue,
+    actually near. On a 35-course catalogue with k=40 that is the entire catalogue,
     and rank fusion then dutifully ranks pure noise. Keeping only hits within
     `retrieval_score_ratio` of the best one is model-agnostic: it asks "is this close
     to the best match we found" rather than "does this clear some absolute number I
@@ -266,9 +266,12 @@ def mmr_select(
             redundancy = 0.0
             if selected and vec is not None:
                 redundancy = max(
-                    float(vec @ vectors[s.product_id])
-                    for s in selected
-                    if s.product_id in vectors
+                    (
+                        float(vec @ vectors[s.product_id])
+                        for s in selected
+                        if s.product_id in vectors
+                    ),
+                    default=0.0,
                 )
             score = lambda_ * relevance - (1 - lambda_) * redundancy
             if score > best_score:

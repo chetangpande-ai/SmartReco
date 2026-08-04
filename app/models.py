@@ -1,10 +1,14 @@
-"""The schema. Nine tables, all related.
+"""The schema. Ten tables: nine related, plus a standalone embedding cache.
 
     users ─┬─1:1─ user_profiles
            ├─1:N─ events ──N:1─ products ─1:N─ vector_outbox
            ├─1:N─ recommendations ─1:N─ recommendation_items ─N:1─ products
            ├─1:N─ agent_runs
            └─1:N─ notifications
+
+`embedding_cache` deliberately joins to nothing: it is keyed by (embedder, text), not by
+product, so re-seeding the catalogue or re-running a search reuses vectors already paid
+for even when the row that first needed them is gone.
 """
 
 from datetime import UTC, datetime, timedelta

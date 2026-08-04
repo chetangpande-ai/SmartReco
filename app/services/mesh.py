@@ -181,8 +181,11 @@ class MeshClient:
         self._client: OpenAI | None = None
         self._budget = _Budget()
         self._breaker = _Breaker()
-        # Parameters a given model has rejected, learned at runtime.
-        self._unsupported: dict[str, set[str]] = {}
+        # Parameters a given model has rejected, learned at runtime: {model: {param:
+        # replacement or None}}. A replacement is carried forward rather than just
+        # dropped, because `max_tokens` is renamed rather than unsupported and losing it
+        # would silently discard the output ceiling on every later call.
+        self._unsupported: dict[str, dict[str, str | None]] = {}
 
     @property
     def client(self) -> OpenAI:
@@ -248,11 +251,18 @@ class MeshClient:
             params["temperature"] = temperature
         if json_mode:
             params["response_format"] = {"type": "json_object"}
-        for dropped in self._unsupported.get(model, ()):
-            params.pop(dropped, None)
+        for rejected, replacement in self._unsupported.get(model, {}).items():
+            value = params.pop(rejected, None)
+            if replacement is not None and value is not None:
+                params[replacement] = value
 
+        # Only transient failures spend the attempt budget. Dropping a rejected parameter
+        # re-sends a payload the gateway has not seen yet, so charging it as a retry used
+        # to leave a quirky model one real attempt out of three. The loop still terminates:
+        # _drop_rejected_param pops the offending key, so each parameter can fire once.
         last_error: Exception | None = None
-        for attempt in range(attempts):
+        failures = 0
+        while failures < attempts:
             started = time.perf_counter()
             try:
                 resp = self.client.chat.completions.create(**params)
@@ -266,10 +276,11 @@ class MeshClient:
                 continue
             except (RateLimitError, APIConnectionError, APIStatusError) as e:
                 last_error = e
+                failures += 1
                 self._breaker.failure()
-                if attempt == attempts - 1:
+                if failures >= attempts:
                     break
-                time.sleep(0.5 * (2**attempt))
+                time.sleep(0.5 * (2 ** (failures - 1)))
                 continue
 
             self._breaker.success()
@@ -282,12 +293,12 @@ class MeshClient:
         low = message.lower()
         for param in ("temperature", "response_format", "max_tokens"):
             if param in low and param in params:
-                if param == "max_tokens":
-                    # Newer reasoning endpoints renamed it rather than dropping it.
-                    params["max_completion_tokens"] = params.pop("max_tokens")
-                else:
-                    params.pop(param)
-                self._unsupported.setdefault(model, set()).add(param)
+                # Newer reasoning endpoints renamed max_tokens rather than dropping it.
+                replacement = "max_completion_tokens" if param == "max_tokens" else None
+                value = params.pop(param)
+                if replacement is not None:
+                    params[replacement] = value
+                self._unsupported.setdefault(model, {})[param] = replacement
                 return param
         return None
 

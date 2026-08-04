@@ -14,7 +14,7 @@ concurrency:
 
 env:
   # Where the API actually lives. This is the only value that changes between environments.
-  API_BASE: https://careerapi-staging.krishnaik.in
+  API_BASE: https://careerapi-production.krishnaik.in
   # Opaque identifier stamped into the OIDC token. NOT a URL that gets fetched, and NOT
   # environment-specific — the server accepts this exact string everywhere. Do not change it.
   OIDC_AUDIENCE: https://career.krishnaik.in

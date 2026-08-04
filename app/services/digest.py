@@ -91,7 +91,7 @@ def send_daily_digests() -> dict:
                 continue
 
             subject, html, text = render_digest(db, fresh, rec)
-            delivered = notify.send_once(
+            outcome = notify.send_once(
                 db,
                 fresh,
                 dedupe_key=f"digest:{fresh.id}:{today}",
@@ -100,9 +100,11 @@ def send_daily_digests() -> dict:
                 text=text,
                 recommendation_id=rec.id,
             )
-            if delivered:
+            if outcome == "sent":
                 fresh.last_digest_at = utcnow()
                 sent += 1
+            elif outcome == "failed":
+                failed += 1
             else:
                 skipped += 1
 

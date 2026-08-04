@@ -136,7 +136,7 @@ class TestSmtpSend:
                 db, db.get(User, uid), dedupe_key="digest:smtp:down",
                 subject="s", html="<p>x</p>", text="x",
             )
-        assert not delivered
+        assert delivered == "failed"
         with session_scope() as db:
             note = db.scalar(
                 select(Notification).where(Notification.dedupe_key == "digest:smtp:down")
@@ -295,6 +295,25 @@ class TestDelivery:
         for f in files:
             f.unlink(missing_ok=True)
 
+    def test_a_send_failure_is_counted_as_failed_not_skipped(self, digest_user, monkeypatch):
+        """Regression: the `failed` counter was permanently 0.
+
+        send_once returned False for both a duplicate and a real delivery failure, so the
+        caller filed every failure under `skipped` and the digest job reported a clean run
+        while nothing was being delivered.
+        """
+
+        class Broken:
+            backend = "broken"
+
+            def send(self, *args, **kwargs):
+                raise RuntimeError("smtp refused connection")
+
+        monkeypatch.setattr(notify, "get_notifier", lambda: Broken())
+        result = digest.send_daily_digests()
+        assert result["failed"] == 1
+        assert result["sent"] == 0 and result["skipped"] == 0
+
     def test_failure_is_recorded_not_swallowed(self, catalog, user_factory, monkeypatch):
         uid = user_factory()
 
@@ -310,7 +329,7 @@ class TestDelivery:
                 db, db.get(User, uid), dedupe_key="digest:test:fail",
                 subject="s", html="<p>x</p>", text="x",
             )
-        assert not delivered
+        assert delivered == "failed"
         with session_scope() as db:
             note = db.scalar(
                 select(Notification).where(Notification.dedupe_key == "digest:test:fail")

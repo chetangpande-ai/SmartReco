@@ -303,7 +303,12 @@ class TestTriggerPolicy:
                       count=6, hours_ago=0.05)
         with session_scope() as db:
             P.refresh(db, uid)
-        _give_recommendation(uid, signature="OTHER")
+        # Backdated 30s: still well inside the 90s cooldown, but far enough that the
+        # events below cannot share last_rec_at's timestamp. _count_since counts with a
+        # strict `>`, so at minutes_ago=0 a same-tick event is miscounted as *not* new
+        # and the decision comes back too_few_new_events instead — the mirror image of
+        # the race documented on test_too_few_new_events above.
+        _give_recommendation(uid, signature="OTHER", minutes_ago=0.5)
         event_factory(uid, "product_view", product_id=catalog["Practical Ethical Hacking"],
                       count=8)
         with session_scope() as db:
