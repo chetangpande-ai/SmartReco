@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.db import session_scope
-from app.models import Event, Product, Recommendation, User, utcnow
+from app.models import Event, Recommendation, User, utcnow
 from app.services import notify, recommender
 from app.services import profile as profile_service
 from app.templating import templates
@@ -42,20 +42,9 @@ def active_users_today(db: Session, since_hours: int = 14) -> list[User]:
 
 
 def render_digest(db: Session, user: User, rec: Recommendation) -> tuple[str, str, str]:
-    products = {
-        p.id: p
-        for p in db.scalars(
-            select(Product).where(Product.id.in_([i.product_id for i in rec.items]))
-        )
-    }
-    items = [
-        {"product": products[i.product_id], "reason": i.reason}
-        for i in rec.items
-        if i.product_id in products
-    ]
     context = {
         "rec": rec,
-        "items": items,
+        "items": recommender.items_with_products(db, rec),
         "evidence": profile_service.evidence(db, user.id, limit=5),
         "base_url": settings.base_url.rstrip("/"),
         "user": user,

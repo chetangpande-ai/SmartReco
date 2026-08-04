@@ -18,6 +18,7 @@ from app.db import session_scope
 from app.logging_conf import new_request_id, request_id_var
 from app.models import (
     AgentRun,
+    Product,
     Recommendation,
     RecommendationItem,
     UserProfile,
@@ -33,6 +34,28 @@ log = logging.getLogger(__name__)
 
 def get_current(db: Session, user_id: int) -> Recommendation | None:
     return triggers.current_recommendation(db, user_id)
+
+
+def items_with_products(db: Session, rec: Recommendation | None) -> list[dict]:
+    """A recommendation's picks joined to their products, in rank order.
+
+    An item whose product has since been deleted is dropped rather than rendered as a
+    hole. Both surfaces that show a recommendation — the dashboard and the digest
+    email — need exactly this, so it lives here rather than in either of them.
+    """
+    if rec is None:
+        return []
+    products = {
+        p.id: p
+        for p in db.scalars(
+            select(Product).where(Product.id.in_([i.product_id for i in rec.items]))
+        )
+    }
+    return [
+        {"product": products[i.product_id], "reason": i.reason, "rank": i.rank}
+        for i in rec.items
+        if i.product_id in products
+    ]
 
 
 def generate_for_user(user_id: int, *, force: bool = False) -> Recommendation | None:
@@ -73,26 +96,21 @@ def generate_for_user(user_id: int, *, force: bool = False) -> Recommendation | 
         final, trace_url = _invoke(state)
         error = final.get("error", "")
     except Exception as exc:
-        # A failed agent run must not surface as a 500 on a page the user was browsing.
-        # Record it, keep whatever they had, move on.
         log.exception("agent run failed", extra={"user_id": user_id})
-        _record_run(user_id, None, decision.reason, {}, int((time.perf_counter() - started) * 1000),
-                    status="error", error=str(exc)[:1000], request_id=request_id, trace_url="")
-        metrics.inc("smartreco_agent_runs_total", status="error")
-        with session_scope() as db:
-            return triggers.current_recommendation(db, user_id)
+        return _failed_run(
+            user_id, decision.reason, {}, int((time.perf_counter() - started) * 1000),
+            error=str(exc)[:1000], request_id=request_id, trace_url="",
+        )
 
     latency_ms = int((time.perf_counter() - started) * 1000)
 
     if error or not final.get("picks"):
         log.warning("agent produced nothing usable",
                     extra={"user_id": user_id, "error": error, "path": final.get("node_path")})
-        _record_run(user_id, None, decision.reason, final, latency_ms,
-                    status="error", error=error or "no picks", request_id=request_id,
-                    trace_url=trace_url)
-        metrics.inc("smartreco_agent_runs_total", status="error")
-        with session_scope() as db:
-            return triggers.current_recommendation(db, user_id)
+        return _failed_run(
+            user_id, decision.reason, final, latency_ms,
+            error=error or "no picks", request_id=request_id, trace_url=trace_url,
+        )
 
     rec_id = _persist(user_id, final, signature, centroid)
     _record_run(user_id, rec_id, decision.reason, final, latency_ms,
@@ -189,6 +207,29 @@ def _persist(user_id: int, final: dict, signature: str, centroid: bytes | None) 
             prof.events_since_rec = 0
 
         return rec.id
+
+
+def _failed_run(
+    user_id: int,
+    trigger: str,
+    final: dict,
+    latency_ms: int,
+    *,
+    error: str,
+    request_id: str,
+    trace_url: str,
+) -> Recommendation | None:
+    """Record a failed run and fall back to whatever the user already had.
+
+    A failed agent run must not surface as a 500 on a page someone was just browsing:
+    both failure paths — the graph raising, and the graph returning nothing usable —
+    owe the caller the same thing, so they share this.
+    """
+    _record_run(user_id, None, trigger, final, latency_ms,
+                status="error", error=error, request_id=request_id, trace_url=trace_url)
+    metrics.inc("smartreco_agent_runs_total", status="error")
+    with session_scope() as db:
+        return triggers.current_recommendation(db, user_id)
 
 
 def _record_run(

@@ -5,6 +5,10 @@
 #     docker compose --profile postgres up --build
 #
 # The app is identical either way — only DATABASE_URL changes.
+#
+# Vector store: deployments default to Pinecone, local development to Chroma. Set
+# PINECONE_API_KEY in .env, or override with VECTOR_BACKEND=chroma to run the
+# container against the mounted volume instead.
 
 services:
   app:
@@ -16,6 +20,10 @@ services:
     environment:
       APP_ENV: production
       DATABASE_URL: ${DATABASE_URL:-sqlite+pysqlite:////app/data/smartreco.db}
+      # A container's disk does not survive a restart or a second replica, which is
+      # exactly what Chroma needs. Managed storage is the right default once this is
+      # not running on a laptop; CHROMA_DIR stays set so the override still works.
+      VECTOR_BACKEND: ${VECTOR_BACKEND:-pinecone}
       CHROMA_DIR: /app/data/chroma
       BASE_URL: ${BASE_URL:-http://localhost:8000}
     volumes:

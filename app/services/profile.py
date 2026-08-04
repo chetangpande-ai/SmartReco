@@ -207,6 +207,15 @@ def _top(scores: dict[str, float], n: int) -> list[tuple[str, float]]:
     return sorted(scores.items(), key=lambda kv: -kv[1])[:n]
 
 
+def _duration(ms: int) -> str:
+    """"4m 20s", "4m", "20s" — whichever parts are non-zero. Cited to the user, so a
+    bare "4m 0s" reads as machine output rather than a fact about their session."""
+    minutes, seconds = ms // 60_000, (ms % 60_000) // 1000
+    if minutes and seconds:
+        return f"{minutes}m {seconds}s"
+    return f"{minutes}m" if minutes else f"{seconds}s"
+
+
 def _centroid(weighted_texts: dict[str, float], db: Session) -> bytes | None:
     if not weighted_texts:
         return None
@@ -337,11 +346,7 @@ def evidence(db: Session, user_id: int, limit: int = 8) -> list[str]:
         )
     for title, ms in sorted(dwell.items(), key=lambda kv: -kv[1])[:3]:
         if ms >= 20_000:
-            minutes, seconds = ms // 60000, (ms % 60000) // 1000
-            spent = f"{minutes}m {seconds}s" if minutes and seconds else (
-                f"{minutes}m" if minutes else f"{seconds}s"
-            )
-            facts.append(f"spent {spent} reading '{title}'")
+            facts.append(f"spent {_duration(ms)} reading '{title}'")
     for title, count in sorted(views.items(), key=lambda kv: -kv[1])[:3]:
         facts.append(f"looked at {title}" + (f" {count} times" if count > 1 else ""))
     if categories:

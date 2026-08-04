@@ -300,7 +300,7 @@ token-bucket rate limiting; CSP and security headers.
 | ⭐ **Observability** | **LangSmith** traces the graph (with the Mesh calls nested inside as real `llm` runs), **Logfire** traces the request around it — HTTP, SQL, tokens — and one run reaches both through LangSmith's OTel bridge. **Both live, not just wired.** Plus a durable `agent_runs` table: node path, grade, refines, tokens, cost, latency, trace URL. [Details ↓](#observability-two-views-one-run) |
 | ⭐ **Retrieval polish** | Hybrid vector+BM25 → RRF → metadata filters → MMR → LLM re-rank. Relevance floor **tuned by sweep, not guessed** |
 | ➕ **Guardrails** | Deterministic rails always on (free, offline); NeMo Guardrails as an opt-in second layer, routed through Mesh |
-| ➕ **Two vector backends** | Chroma (default) and Pinecone behind one 7-method protocol. **Both verified against live indexes** — identical recall on the same 20 probes, one env var apart |
+| ➕ **Two vector backends** | Chroma locally, Pinecone when deployed, behind one 7-method protocol. **Both verified against live indexes** — identical recall on the same 20 probes, one env var apart |
 | ➕ **Offline eval harness** | 20 paraphrase probes, recall@k + MRR, `make eval` |
 
 ---
@@ -493,7 +493,7 @@ Everything is in `.env` (see `.env.example`). The knobs that matter most:
 | `REC_COOLDOWN_SECONDS` | `90` | Floor between runs for one learner |
 | `REC_DRIFT_THRESHOLD` | `0.10` | Interest change needed to justify a call |
 | `RETRIEVAL_SCORE_RATIO` | `0.55` | Relevance floor, relative to the best hit |
-| `VECTOR_BACKEND` | `chroma` | or `pinecone` |
+| `VECTOR_BACKEND` | `chroma` | `chroma` locally, `pinecone` when deployed — `docker compose` sets it |
 | `LANGSMITH_TRACING` | `false` | `true` + an API key traces the graph |
 | `LOGFIRE_ENABLED` | `false` | Needs `LOGFIRE_TOKEN` **or** `LOGFIRE_CONSOLE=true` to do anything |
 | `MAIL_BACKEND` | `auto` | `auto` picks SMTP if configured, else the file sink |
@@ -512,6 +512,14 @@ make migrate                                   # alembic upgrade head
 Multi-stage image, non-root user, healthcheck, `data/` on a volume. CI runs lint,
 the suite on Python 3.11 and 3.12 with an 80% coverage floor, a from-scratch migration
 check, a seed-and-verify-sync check, and a container build that must report healthy.
+
+**The vector store follows the same local/remote split as the database.** Chroma is a
+file on disk — no account, no network — which is what lets the test suite, CI and a
+fresh `git clone` work with nothing signed up for. A container's disk does not survive
+a restart or a second replica, so `docker compose` sets `VECTOR_BACKEND=pinecone` and
+expects `PINECONE_API_KEY` in `.env`. Override with `VECTOR_BACKEND=chroma` to run the
+container against the mounted volume instead. Nothing above `vectorstore.py` knows
+which one is live, and the two are never used at once.
 
 Set `MESH_API_KEY` as a GitHub Actions secret if you want live runs in CI — the test
 suite does not need it.
@@ -551,8 +559,9 @@ Verified live afterwards: 35 vectors indexed from the embedding cache for **$0**
 20-probe eval identical to Chroma, drift injected and repaired at exactly 1 vector rather
 than 35, and a full agent run at $0.000492.
 
-Chroma remains the committed default, so `git clone && make seed && make run` still needs
-no signup — but the production path is now a path someone has actually walked.
+Chroma remains the local default, so `git clone && make seed && make run` still needs no
+signup, and it is what the suite and CI run against — but deployments go to Pinecone, and
+that path is now one someone has actually walked.
 - **APScheduler assumes one process.** The jobs are individually safe to run
   concurrently (the outbox coalesces, reconcile is a diff, the digest has a unique
   key), so scaling out means changing the scheduler, not the jobs.

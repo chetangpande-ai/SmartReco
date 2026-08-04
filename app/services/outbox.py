@@ -33,6 +33,23 @@ def _backoff_seconds(attempts: int) -> float:
     return min(300.0, 2.0**attempts) * (0.5 + random.random())
 
 
+def _coalesce(rows: list[VectorOutbox], now) -> tuple[dict[int, VectorOutbox], int]:
+    """Keep only the last row per product, closing the ones it supersedes.
+
+    Five rapid edits to one product need the final state applied once, not five
+    embeddings of intermediate states we are about to overwrite anyway.
+    """
+    latest: dict[int, VectorOutbox] = {}
+    superseded = 0
+    for row in rows:
+        if row.product_id in latest:
+            stale = latest[row.product_id]
+            stale.status, stale.processed_at, stale.last_error = "done", now, "superseded"
+            superseded += 1
+        latest[row.product_id] = row
+    return latest, superseded
+
+
 def drain(limit: int = 200) -> dict:
     now = utcnow()
     with session_scope() as db:
@@ -48,16 +65,7 @@ def drain(limit: int = 200) -> dict:
             _update_pending_gauge(db)
             return dict(_EMPTY)
 
-        # Coalesce per product: five rapid edits need the final state applied once, not
-        # five embeddings of intermediate states we are about to overwrite anyway.
-        latest: dict[int, VectorOutbox] = {}
-        superseded = 0
-        for row in rows:
-            if row.product_id in latest:
-                stale = latest[row.product_id]
-                stale.status, stale.processed_at, stale.last_error = "done", now, "superseded"
-                superseded += 1
-            latest[row.product_id] = row
+        latest, superseded = _coalesce(rows, now)
 
         upsert_ids = [pid for pid, r in latest.items() if r.op == "upsert"]
         delete_ids = [pid for pid, r in latest.items() if r.op == "delete"]
