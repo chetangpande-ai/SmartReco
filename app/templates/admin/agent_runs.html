@@ -1,13 +1,11 @@
 {% extends "base.html" %}
+{% from "admin/_subnav.html" import admin_subnav %}
 {% block title %}Agent runs — SmartReco admin{% endblock %}
 
 {% block content %}
 <div class="admin-head">
   <h1>Agent runs</h1>
-  <nav class="admin-nav">
-    <a class="nav-link" href="/admin">Operations</a>
-    <a class="nav-link" href="/admin/products">Catalogue</a>
-  </nav>
+  {{ admin_subnav('agent-runs') }}
 </div>
 
 <div class="stat-row">

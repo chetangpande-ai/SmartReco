@@ -1,15 +1,11 @@
 {% extends "base.html" %}
+{% from "admin/_subnav.html" import admin_subnav %}
 {% block title %}Operations — SmartReco admin{% endblock %}
 
 {% block content %}
 <div class="admin-head">
   <h1>Operations</h1>
-  <nav class="admin-nav">
-    <a class="nav-link" href="/admin/products">Catalogue</a>
-    <a class="nav-link" href="/admin/agent-runs">Agent runs</a>
-    <a class="nav-link" href="/metrics">Metrics</a>
-    <a class="nav-link" href="/readyz">Readiness</a>
-  </nav>
+  {{ admin_subnav('operations') }}
 </div>
 
 <div class="stat-row">
@@ -27,7 +23,7 @@
       </span>
     </div>
     <dl class="kv">
-      <dt>Published products (SQL)</dt><dd>{{ sync.sql_published }}</dd>
+      <dt>Published courses (SQL)</dt><dd>{{ sync.sql_published }}</dd>
       <dt>Vectors indexed</dt><dd>{{ sync.vector_count }}</dd>
       <dt>Awaiting sync</dt><dd>{{ sync.pending }}</dd>
       <dt>Never synced</dt><dd>{{ sync.unsynced_products }}</dd>

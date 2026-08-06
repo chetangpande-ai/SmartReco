@@ -97,7 +97,7 @@
     {% for name, score in profile.interests.items() %}
       {% if loop.index <= 6 %}
       <div class="bar-row">
-        <span class="bar-label">{{ name }}</span>
+        <span class="bar-label">{{ name|track }}</span>
         <span class="bar"><span class="bar-fill" style="width: {{ (score / peak * 100)|round }}%"></span></span>
         <span class="bar-value">{{ '%.1f'|format(score) }}</span>
       </div>

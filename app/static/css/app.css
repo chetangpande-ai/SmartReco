@@ -64,10 +64,36 @@ h1 { font-size: 1.9rem; }
   border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font-size: .9rem;
 }
 .search input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
-.nav { display: flex; align-items: center; gap: 14px; margin-left: auto; }
-.nav-link { font-size: .9rem; color: var(--muted); }
+.nav { display: flex; align-items: center; gap: 22px; margin-left: auto; }
+.nav-links { display: flex; align-items: center; gap: 14px; }
+.nav-link { font-size: .9rem; color: var(--muted); padding: 6px 2px; border-bottom: 2px solid transparent; }
 .nav-link:hover { color: var(--text); }
-.nav-user { font-size: .875rem; font-weight: 550; }
+.nav-link.active { color: var(--text); font-weight: 650; border-bottom-color: var(--accent); }
+
+/* The account group is identity + sign-out — kept visually apart from the nav links
+   so it never reads as another tab (that read as a duplicate "Admin" tab before). */
+.account {
+  display: flex; align-items: center; gap: 10px;
+  padding: 5px 6px 5px 6px; border-radius: 999px;
+  background: var(--surface-2); border: 1px solid var(--border);
+}
+.user-chip { display: inline-flex; align-items: center; gap: 8px; font-size: .875rem; color: var(--text); }
+.avatar {
+  position: relative;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 50%; background: var(--surface);
+  border: 1px solid var(--border); color: var(--muted); font-size: .78rem; font-weight: 650;
+  flex: none;
+}
+.avatar-badge {
+  position: absolute; bottom: -3px; right: -3px;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--accent); border: 2px solid var(--surface-2);
+  display: flex; align-items: center; justify-content: center;
+}
+.avatar-badge svg { width: 8px; height: 8px; color: #fff; }
+.user-chip-text { font-weight: 550; padding-right: 2px; }
+.account .btn-ghost { border-color: transparent; padding: 6px 12px; font-size: .82rem; }
 
 /* ---- buttons ---- */
 .btn {

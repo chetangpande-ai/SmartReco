@@ -76,6 +76,34 @@ honesty* before anyone sees it.
 
 ---
 
+## What it looks like
+
+**The catalogue** — 35 real courses, filterable by track and level. Artwork is generated
+per slug, so there are no third-party image requests and nothing reads as a missing asset.
+
+![SmartReco catalogue](docs/screenshots/catalogue.png)
+
+**A recommendation**, written by the agent for one learner from that learner's behaviour.
+The *"Why these?"* panel underneath is the part that matters: it lists **the only signals
+the agent was allowed to cite** — the enrolment, the two searches, the dwell times, the
+repeat views. Every claim in the prose above is checkable against that list.
+
+Two details worth looking for: the header reads `agentic · openai/gpt-4o-mini ·
+confidence 68%`, and *Machine Learning Specialization* — the course they already enrolled
+in — is **not** recommended back to them.
+
+![Personalised recommendations with the evidence panel](docs/screenshots/recommendations.png)
+
+**Operations** — SQL↔vector sync health, the trigger policy's skip reasons with a live
+"100% avoided" ratio, the agent graph **read from the compiled LangGraph object** so it
+cannot drift from what actually runs, the scheduler's next fire times, and every run's
+node path, grade and refine count. Those
+`analyze→plan→retrieve→grade→refine→retrieve→grade→…` rows are real refine loops.
+
+![Admin operations dashboard](docs/screenshots/admin.png)
+
+---
+
 ## Quickstart
 
 ```bash
@@ -84,6 +112,15 @@ cp .env.example .env          # add your MESHAPI_API_KEY (starts with rsk_)
 make install
 make seed
 make run                      # http://localhost:8000
+```
+
+**Windows without `make`** (PowerShell/cmd, e.g. plain VS Code terminal — `make` isn't
+a native Windows command): every target is a one-line `uv` call, so run them directly.
+
+```
+uv sync --all-extras
+uv run python -m app.seed
+uv run uvicorn app.main:app --reload --port 8000    # http://localhost:8000
 ```
 
 | Sign in as | Email | Password |
@@ -462,6 +499,9 @@ make test     # 314 tests, offline, no API key, spends nothing
 make cov      # coverage report (90%)
 make eval     # retrieval quality against 20 paraphrase probes
 ```
+
+Without `make` (Windows): `uv run pytest tests/ -q`, add `--cov=app --cov-report=term-missing`
+for `cov`, or `uv run python scripts/eval_retrieval.py` for `eval`.
 
 | Module | Covers |
 |---|---|

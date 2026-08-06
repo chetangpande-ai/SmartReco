@@ -47,7 +47,7 @@ def _form_to_product(form) -> ProductIn:
 def ops_dashboard(request: Request, db: Session = Depends(get_db)):
     counts = {
         "users": db.scalar(select(func.count()).select_from(User)),
-        "products": db.scalar(select(func.count()).select_from(Product)),
+        "courses": db.scalar(select(func.count()).select_from(Product)),
         "events": db.scalar(select(func.count()).select_from(Event)),
         "recommendations": db.scalar(select(func.count()).select_from(Recommendation)),
     }

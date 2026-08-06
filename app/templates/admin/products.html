@@ -1,14 +1,12 @@
 {% extends "base.html" %}
+{% from "admin/_subnav.html" import admin_subnav %}
 {% block title %}Catalogue — SmartReco admin{% endblock %}
 
 {% block content %}
 <div class="admin-head">
   <h1>Catalogue</h1>
-  <nav class="admin-nav">
-    <a class="nav-link" href="/admin">Operations</a>
-    <a class="nav-link" href="/admin/agent-runs">Agent runs</a>
-    <a class="btn btn-primary" href="/admin/products/new">Add course</a>
-  </nav>
+  {{ admin_subnav('catalogue') }}
+  <a class="btn btn-primary" href="/admin/products/new">Add course</a>
 </div>
 
 <form class="admin-search" method="get" action="/admin/products">

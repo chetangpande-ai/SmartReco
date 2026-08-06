@@ -23,14 +23,32 @@
 
     <nav class="nav">
       {% if user %}
-        <a href="/me" class="nav-link">My picks</a>
-        {% if user.is_admin %}<a href="/admin" class="nav-link">Admin</a>{% endif %}
-        <span class="nav-user" title="{{ user.email }}">{{ user.name }}</span>
-        <form action="/logout" method="post" class="inline">
-          <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
-          <button class="btn btn-ghost" type="submit">Sign out</button>
-        </form>
+        <div class="nav-links">
+          <a href="/" class="nav-link {{ 'active' if request.url.path == '/' }}">Courses</a>
+          <a href="/me" class="nav-link {{ 'active' if request.url.path.startswith('/me') }}">My picks</a>
+          {% if user.is_admin %}
+            <a href="/admin" class="nav-link {{ 'active' if request.url.path.startswith('/admin') }}">Operations</a>
+          {% endif %}
+        </div>
+        <div class="account">
+          <span class="user-chip" title="{{ user.email }}{{ ' — administrator' if user.is_admin }}">
+            <span class="avatar">
+              {{ user.name[0]|upper }}
+              {% if user.is_admin %}
+                <span class="avatar-badge" aria-label="Administrator">
+                  <svg viewBox="0 0 24 24" fill="none"><path d="M12 2l7 3v6c0 5-3.4 8.4-7 11-3.6-2.6-7-6-7-11V5l7-3z" fill="currentColor"/></svg>
+                </span>
+              {% endif %}
+            </span>
+            <span class="user-chip-text">{{ user.name }}</span>
+          </span>
+          <form action="/logout" method="post" class="inline">
+            <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+            <button class="btn btn-ghost" type="submit">Sign out</button>
+          </form>
+        </div>
       {% else %}
+        <a href="/" class="nav-link {{ 'active' if request.url.path == '/' }}">Courses</a>
         <a href="/login" class="nav-link">Sign in</a>
         <a href="/register" class="btn btn-primary">Get started</a>
       {% endif %}

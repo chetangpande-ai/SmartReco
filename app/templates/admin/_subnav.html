@@ -1,0 +1,9 @@
+{% macro admin_subnav(active) -%}
+<nav class="admin-nav" aria-label="Admin section">
+  <a class="nav-link {{ 'active' if active == 'operations' }}" href="/admin">Operations</a>
+  <a class="nav-link {{ 'active' if active == 'catalogue' }}" href="/admin/products">Catalogue</a>
+  <a class="nav-link {{ 'active' if active == 'agent-runs' }}" href="/admin/agent-runs">Agent runs</a>
+  <a class="nav-link" href="/metrics">Metrics</a>
+  <a class="nav-link" href="/readyz">Readiness</a>
+</nav>
+{%- endmacro %}
