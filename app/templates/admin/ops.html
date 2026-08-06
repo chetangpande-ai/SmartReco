@@ -90,9 +90,12 @@
     <div class="chips">
       {% for n in graph.nodes %}<span class="chip">{{ n }}</span>{% endfor %}
     </div>
-    <ul class="edges mono small">
+    <ul class="edges">
       {% for e in graph.edges %}
-        <li>{{ e.from }} → {{ e.to }}{% if e.conditional %} <span class="muted">(conditional)</span>{% endif %}</li>
+        <li>
+          <span class="mono">{{ e.from }} → {{ e.to }}</span>
+          {% if e.conditional %}<span class="edge-badge">conditional</span>{% endif %}
+        </li>
       {% endfor %}
     </ul>
   </section>

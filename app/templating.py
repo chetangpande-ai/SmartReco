@@ -18,14 +18,27 @@ _TRACK_LABELS = {"ai-ml": "AI & ML", "web-dev": "Web Dev"}
 templates.env.filters["track"] = lambda slug: _TRACK_LABELS.get(slug, slug.replace("-", " "))
 
 
-def _hue(text: str) -> int:
-    """Stable hue per product, so a given item always renders the same colour.
+# One deliberate base hue per category, 42° apart around the wheel — enough separation
+# to read as distinct at the pastel saturation/lightness the tiles render at. Previously
+# the hue was hashed straight off the product slug: it produced a genuinely random
+# colour per item, so a page of thirty-five tiles read as confetti instead of a system.
+# Tying colour to *category* instead means colour becomes a second way to recognise a
+# track at a glance, the same job the glyph already does.
+_CATEGORY_HUE = {
+    "ai-ml": 20, "web-dev": 62, "data": 104, "cloud": 146,
+    "security": 188, "design": 230, "product": 272, "career": 314,
+}
+_DEFAULT_HUE = 250
 
-    Product photography is the one thing a demo catalogue cannot honestly have — real
-    imagery belongs to the manufacturers. Generated tiles keyed off the slug look
-    deliberate rather than broken, and cost no bytes and no third-party requests.
-    """
-    return int(hashlib.sha1(text.encode()).hexdigest()[:6], 16) % 360
+
+def _hue(category: str, slug: str = "") -> int:
+    """Category's base hue, nudged by a small slug-keyed jitter (±8°) so items in the
+    same track are still individually distinguishable rather than perfectly identical."""
+    base = _CATEGORY_HUE.get(category, _DEFAULT_HUE)
+    if not slug:
+        return base
+    jitter = int(hashlib.sha1(slug.encode()).hexdigest()[:4], 16) % 17 - 8
+    return (base + jitter) % 360
 
 
 templates.env.filters["hue"] = _hue

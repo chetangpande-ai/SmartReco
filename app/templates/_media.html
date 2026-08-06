@@ -29,7 +29,7 @@
 {%- endmacro %}
 
 {% macro media(p, size='card') -%}
-<div class="media media-{{ size }}" style="--h: {{ p.slug|hue }}" aria-hidden="true">
+<div class="media media-{{ size }}" style="--h: {{ p.category|hue(p.slug) }}" aria-hidden="true">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25"
        stroke-linecap="round" stroke-linejoin="round">
     {{ glyph(p.category) }}
