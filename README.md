@@ -7,6 +7,32 @@ LangGraph agent, retrieves matching courses from a vector database, and writes a
 persuasive recommendation that is *grounded in the real catalogue* and *checked for
 honesty* before anyone sees it.
 
+- **Behavioural tracking** — search, clicks, dwell time, wishlist/enroll/dismiss, captured without slowing the page down
+- **An agent that reasons**, not a template — LangGraph, hybrid retrieval, LLM-as-judge grading, a groundedness verifier
+- **Collaborative filtering + a heuristic ranker** on top of content-based retrieval, with an exploration slot so the same best guess doesn't compound forever
+- **Guardrails, evals and red-teaming** — deterministic rails always on, DeepEval metrics, adversarial probes against the real generation path
+- **Cost control by design** — an 11-gate trigger policy, daily budget, circuit breaker, and a ranker that skips the LLM call when it's already confident
+- **An operations dashboard** — sync health, call efficiency, the live agent graph, every run's full trace
+- **Fully offline-capable** — runs and tests with `LLM_ENABLED=false`, zero API key required
+
+## Contents
+
+- [Architecture](#architecture)
+- [Key features](#key-features)
+- [What it looks like](#what-it-looks-like)
+- [Quickstart](#quickstart)
+- [Core capabilities, in depth](#core-capabilities-in-depth)
+- [Beyond the basics](#beyond-the-basics)
+- [Why it's built this way](#why-its-built-this-way)
+- [Testing](#testing)
+- [Configuration](#configuration)
+- [Deployment](#deployment)
+- [Honest limitations](#honest-limitations)
+- [Documentation](#documentation)
+- [Stack](#stack)
+
+## Architecture
+
 ```
 ┌──────────────────────────────── BROWSER ─────────────────────────────────────┐
 │ Jinja2 pages · tracker.js → throttle → batch(20 | 5s) → sendBeacon ──┐       │
@@ -36,6 +62,9 @@ honesty* before anyone sees it.
      │  10 tables  │      │ chat + embed │   │ / Pinecone │  │ / file    │
      └─────────────┘      └──────────────┘   └────────────┘  └───────────┘
 ```
+
+Full write-up — components, request path, and short-term vs. long-term context
+management — in [`docs/architecture.md`](docs/architecture.md).
 
 ---
 
@@ -170,7 +199,7 @@ be logged into.
 
 ---
 
-## How each requirement is met
+## Core capabilities, in depth
 
 ### 1. Platform
 
@@ -349,7 +378,7 @@ token-bucket rate limiting; CSP and security headers.
 
 ---
 
-## Bonus features
+## Beyond the basics
 
 | Bonus | Status |
 |---|---|
@@ -367,7 +396,7 @@ token-bucket rate limiting; CSP and security headers.
 
 ---
 
-## Design decisions with evidence
+## Why it's built this way
 
 ### Model selection — measured, not assumed
 
