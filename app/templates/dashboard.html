@@ -45,6 +45,10 @@
       {% set p = entry.product %}
       <article class="card card-rec" data-track-impression
                data-product-slug="{{ p.slug }}" data-position="{{ entry.rank }}">
+        <button type="button" class="card-dismiss" title="Not interested"
+                aria-label="Not interested in {{ p.title }}"
+                data-track-click="dismiss" data-product-slug="{{ p.slug }}"
+                data-position="{{ entry.rank }}" data-source="recommendation">&times;</button>
         <a class="card-link" href="/products/{{ p.slug }}"
            data-track-click="rec_click" data-product-slug="{{ p.slug }}"
            data-position="{{ entry.rank }}" data-source="recommendation">

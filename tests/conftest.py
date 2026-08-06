@@ -28,6 +28,11 @@ os.environ.update(
     # test_observability.py drives both against a stub instead.
     LANGSMITH_TRACING="false",
     LOGFIRE_ENABLED="false",
+    # Real randomness by default (ranking.apply_exploration_slot) would make any test
+    # with more than top_k candidates occasionally flaky. Tests that specifically cover
+    # exploration call apply_exploration_slot directly with an explicit epsilon instead
+    # of going through settings, so this is safe to pin off suite-wide.
+    EXPLORE_EPSILON="0.0",
 )
 
 import pytest  # noqa: E402

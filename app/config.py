@@ -101,6 +101,15 @@ class Settings(BaseSettings):
     retrieval_max_refines: int = 2
     retrieval_rerank: bool = True
 
+    # ---- Ranking (app/agent/ranking.py)
+    # Confidence-gap the heuristic ranker needs over the runner-up before grade() skips
+    # the LLM call entirely and trusts the heuristic ranking as-is. Hand-picked, not
+    # swept — there's no labelled outcome data yet to sweep it against.
+    ranker_skip_margin: float = 0.25
+    # Probability grade()'s candidate order gets one slot swapped for a low-exposure
+    # candidate instead of the ranker's actual top pick — see ranking.apply_exploration_slot.
+    explore_epsilon: float = 0.15
+
     # ---- Email digest
     smtp_host: str = ""
     smtp_port: int = 587

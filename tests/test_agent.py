@@ -6,10 +6,12 @@ from sqlalchemy import select
 from app.agent import nodes
 from app.agent.graph import describe
 from app.agent.state import new_state
+from app.config import settings
 from app.db import session_scope
 from app.models import AgentRun, Product, Recommendation, RecommendationItem, UserProfile
 from app.services import guardrails, recommender
 from app.services import profile as P
+from app.services.mesh import LLMResult
 
 EXPECTED_NODES = {
     "analyze", "plan", "retrieve", "coldstart", "grade", "refine", "generate",
@@ -112,6 +114,198 @@ class TestVerifier:
         assert "no valid products" in nodes.verify(state)["repair_notes"]
 
 
+class TestAdversarialGeneration:
+    """Stubs the model response itself (not just hand-built state) so this exercises the
+    real generate() -> verify() integration against a hallucinating/attacking model,
+    the gap flagged in the 2026-08 audit: nothing mocked mesh to test that path."""
+
+    @pytest.fixture
+    def mesh_available(self, monkeypatch):
+        # Same pattern test_mesh.py uses: makes settings.has_llm true without a real key.
+        monkeypatch.setattr(settings, "llm_enabled", True)
+        monkeypatch.setattr(settings, "meshapi_api_key", "rsk_test")
+
+    def _generate_state(self, catalog):
+        ids = list(catalog.values())[:3]
+        state = new_state(1, "test", "req", 3)
+        state.update(
+            profile_summary="studying: ai-ml",
+            evidence=["enrolled in something"],
+            candidates=[
+                {"product_id": pid, "title": f"t{pid}", "brand": "Test", "category": "ai-ml",
+                 "tier": "advanced", "price_cents": 39900, "rating": 4.5, "spec": "",
+                 "tags": [], "description": ""}
+                for pid in ids
+            ],
+        )
+        return state, ids
+
+    def test_a_hallucinated_pick_from_generate_is_dropped_by_verify(
+        self, catalog, mesh_available, monkeypatch
+    ):
+        state, ids = self._generate_state(catalog)
+
+        def fake_chat_json(messages, **kwargs):
+            data = {
+                "headline": "Your next step",
+                "narrative": "Grounded copy about your interests.",
+                "cta": "Have a look",
+                "picks": [
+                    {"product_id": ids[0], "reason": "real pick"},
+                    {"product_id": 999999, "reason": "a course the model invented"},
+                ],
+            }
+            result = LLMResult(text="", model="test/model", prompt_tokens=10, completion_tokens=10)
+            return data, result
+
+        monkeypatch.setattr(nodes.mesh, "chat_json", fake_chat_json)
+        state.update(nodes.generate(state))
+        assert 999999 in [p["product_id"] for p in state["picks"]], "sanity: the stub id reached state"
+
+        state.update(nodes.verify(state))
+        assert 999999 not in [p["product_id"] for p in state["picks"]]
+        assert ids[0] in [p["product_id"] for p in state["picks"]]
+        assert state["repaired"] is True
+
+    def test_injected_hype_in_the_narrative_is_caught_by_verify(
+        self, catalog, mesh_available, monkeypatch
+    ):
+        state, ids = self._generate_state(catalog)
+
+        def fake_chat_json(messages, **kwargs):
+            data = {
+                "headline": "Guaranteed results",
+                "narrative": "This course guarantees you a six-figure job, only 2 seats left.",
+                "cta": "Act now",
+                "picks": [{"product_id": ids[0], "reason": "real pick"}],
+            }
+            result = LLMResult(text="", model="test/model", prompt_tokens=10, completion_tokens=10)
+            return data, result
+
+        monkeypatch.setattr(nodes.mesh, "chat_json", fake_chat_json)
+        state.update(nodes.generate(state))
+        state.update(nodes.verify(state))
+        assert state["repaired"] is True
+        assert "forbidden_claim" in state["repair_notes"] or "fabricated_urgency" in state["repair_notes"]
+
+
+class TestHeuristicGradeSkip:
+    @pytest.fixture
+    def mesh_available(self, monkeypatch):
+        monkeypatch.setattr(settings, "llm_enabled", True)
+        monkeypatch.setattr(settings, "meshapi_api_key", "rsk_test")
+
+    def _state(self, catalog, *, clear_margin: bool):
+        ids = list(catalog.values())[:2]
+        state = new_state(1, "test", "req", 2)
+        state["profile_summary"] = "studying: ai-ml"
+        state["evidence"] = ["enrolled in something"]
+        state["profile_features"] = {
+            "interests": {"ai-ml": 5.0},
+            "tag_scores": {"pytorch": 5.0},
+            "brand_scores": {"DeepLearning.AI": 5.0},
+            "price_affinity_cents": 5000,
+            "tier_affinity": "advanced",
+        }
+        if clear_margin:
+            candidates = [
+                {"product_id": ids[0], "title": "match", "brand": "DeepLearning.AI",
+                 "category": "ai-ml", "tier": "advanced", "price_cents": 5000, "rating": 5.0,
+                 "spec": "", "tags": ["pytorch"], "description": ""},
+                {"product_id": ids[1], "title": "mismatch", "brand": "Meta",
+                 "category": "web-dev", "tier": "beginner", "price_cents": 50_000, "rating": 0.0,
+                 "spec": "", "tags": ["react"], "description": ""},
+            ]
+        else:
+            # Two candidates with identical heuristic inputs — margin is exactly 0.
+            candidates = [
+                {"product_id": pid, "title": f"t{pid}", "brand": "", "category": "",
+                 "tier": "", "price_cents": 0, "rating": 0.0, "spec": "", "tags": [],
+                 "description": ""}
+                for pid in ids
+            ]
+        state["candidates"] = candidates
+        return state
+
+    def test_skips_the_llm_call_when_the_heuristic_is_confident(
+        self, catalog, mesh_available, monkeypatch
+    ):
+        state = self._state(catalog, clear_margin=True)
+
+        def fail_if_called(*a, **k):
+            raise AssertionError("LLM should not have been called")
+
+        monkeypatch.setattr(nodes.mesh, "chat_json", fail_if_called)
+        out = nodes.grade(state)
+        assert "grade_skipped_heuristic_confident" in out["warnings"]
+        assert out["candidates"][0]["title"] == "match"
+
+    def test_calls_the_llm_when_the_heuristic_is_ambiguous(
+        self, catalog, mesh_available, monkeypatch
+    ):
+        state = self._state(catalog, clear_margin=False)
+
+        def fake_chat_json(messages, **kwargs):
+            data = {"score": 0.8, "notes": "fine", "ranked_ids": [], "better_query": ""}
+            result = LLMResult(text="", model="test/model", prompt_tokens=5, completion_tokens=5)
+            return data, result
+
+        monkeypatch.setattr(nodes.mesh, "chat_json", fake_chat_json)
+        out = nodes.grade(state)
+        assert "grade_skipped_heuristic_confident" not in out.get("warnings", [])
+        assert out["grade_score"] == 0.8
+
+
+class TestExplorationIntegration:
+    def test_generate_surfaces_a_low_exposure_candidate(
+        self, catalog, user_factory, event_factory, monkeypatch
+    ):
+        """End-to-end wiring check: generate() actually queries impression_counts and
+        applies the exploration slot, not just the pure function in isolation."""
+        monkeypatch.setattr(settings, "explore_epsilon", 1.0)
+        uid = user_factory()
+        ids = list(catalog.values())[:5]
+        for pid in ids[:-1]:
+            event_factory(uid, "rec_impression", product_id=pid, count=10)
+        # ids[-1] has never been shown — the exploration slot should force it in.
+
+        state = new_state(uid, "test", "req", 2)
+        state["profile_summary"] = "studying: ai-ml"
+        state["evidence"] = []
+        state["candidates"] = [
+            {"product_id": pid, "title": f"t{pid}", "brand": "Test", "category": "ai-ml",
+             "tier": "advanced", "price_cents": 39900, "rating": 4.5, "spec": "",
+             "tags": [], "description": ""}
+            for pid in ids
+        ]
+        out = nodes.generate(state)
+        pick_ids = [p["product_id"] for p in out["picks"]]
+        assert ids[-1] in pick_ids
+
+    def test_epsilon_zero_never_forces_a_low_exposure_candidate_in(
+        self, catalog, user_factory, event_factory, monkeypatch
+    ):
+        monkeypatch.setattr(settings, "explore_epsilon", 0.0)
+        uid = user_factory()
+        ids = list(catalog.values())[:5]
+        for pid in ids[:-1]:
+            event_factory(uid, "rec_impression", product_id=pid, count=10)
+
+        state = new_state(uid, "test", "req", 2)
+        state["profile_summary"] = "studying: ai-ml"
+        state["evidence"] = []
+        state["candidates"] = [
+            {"product_id": pid, "title": f"t{pid}", "brand": "Test", "category": "ai-ml",
+             "tier": "advanced", "price_cents": 39900, "rating": 4.5, "spec": "",
+             "tags": [], "description": ""}
+            for pid in ids
+        ]
+        out = nodes.generate(state)
+        pick_ids = [p["product_id"] for p in out["picks"]]
+        assert ids[-1] not in pick_ids
+        assert pick_ids == ids[:2]
+
+
 class TestRepairRouting:
     def test_first_failure_retries_generation(self):
         state = new_state(1, "t", "r", 3)
@@ -141,6 +335,44 @@ class TestColdStart:
         state = new_state(1, "t", "r", 4)
         state["query"] = ""
         assert nodes.route_after_plan({**state, **nodes.plan(state)}) == "coldstart"
+
+    def test_respects_exclude_ids_from_filters(self, catalog, user_factory):
+        """Regression: coldstart() used to call popular() without exclude_ids at all,
+        even though popular() already supported it — dismissed/committed courses would
+        silently reappear on the no-history path."""
+        uid = user_factory()
+        excluded = list(catalog.values())[:2]
+        state = new_state(uid, "t", "r", 4)
+        state["filters"] = {"exclude_ids": excluded}
+        out = nodes.coldstart(state)
+        got_ids = {c["product_id"] for c in out["candidates"]}
+        assert not got_ids & set(excluded)
+
+
+class TestDismiss:
+    def test_analyze_excludes_a_dismissed_product(self, catalog, user_factory, event_factory):
+        uid = user_factory()
+        pid = catalog["Deep Learning Specialization"]
+        event_factory(uid, "dismiss", product_id=pid)
+        out = nodes.analyze(new_state(uid, "t", "r", 4))
+        assert pid in out["filters"]["exclude_ids"]
+
+    def test_dismiss_does_not_register_as_interest(self, catalog, user_factory, event_factory):
+        """A "not interested" click must never look like mild positive interest."""
+        uid = user_factory()
+        pid = catalog["Deep Learning Specialization"]
+        event_factory(uid, "dismiss", product_id=pid)
+        with session_scope() as db:
+            prof = P.refresh(db, uid)
+        assert prof.interests == {}
+
+    def test_dismiss_is_a_valid_event_type(self):
+        from app.schemas import EventIn
+
+        assert EventIn(type="dismiss", product_id=1).type == "dismiss"
+
+    def test_dismiss_has_zero_weight(self):
+        assert P.EVENT_WEIGHTS["dismiss"] == 0.0
 
 
 class TestEndToEndOffline:

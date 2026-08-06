@@ -27,7 +27,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.models import Product
+from app.models import Event, Product
 from app.services.embeddings import embedder
 from app.services.vectorstore import Filter, get_vector_store
 
@@ -82,14 +82,20 @@ class Candidate:
     lexical_score: float = 0.0
     vector_rank: int = 0  # 0 == not retrieved by this ranker
     lexical_rank: int = 0
+    cf_score: float = 0.0
+    cf_rank: int = 0  # collaborative-filtering leg: 0 == not a co-occurrence hit
     fused_score: float = 0.0
     final_score: float = 0.0
 
     @property
     def retrieved_by(self) -> str:
-        if self.vector_rank and self.lexical_rank:
-            return "both"
-        return "vector" if self.vector_rank else "lexical"
+        legs = [
+            name
+            for name, rank in (("vector", self.vector_rank), ("lexical", self.lexical_rank),
+                                ("cf", self.cf_rank))
+            if rank
+        ]
+        return "+".join(legs) or "popularity"
 
 
 @dataclass
@@ -206,6 +212,42 @@ def rrf_fuse(
     return fused
 
 
+def _cf_hits(
+    db: Session, committed_ids: set[int], exclude: set[int], top_n: int
+) -> list[tuple[int, float]]:
+    """Item-to-item collaborative signal: courses that co-occur with this learner's own
+    committed courses in *other* users' committed history — "people who enrolled in what
+    you enrolled in also enrolled in these." Empty when `committed_ids` is empty (a new
+    learner with no history yet), which is what keeps this leg a pure addition rather
+    than a behaviour change for the common case.
+    """
+    if not committed_ids:
+        return []
+
+    # Deferred import: app.services.profile imports `tokenize` from this module, so a
+    # module-level import here would be circular.
+    from app.services.profile import COMMITTED_EVENTS
+
+    co_users = (
+        select(Event.user_id)
+        .where(Event.product_id.in_(committed_ids), Event.type.in_(COMMITTED_EVENTS))
+        .distinct()
+    )
+    rows = db.execute(
+        select(Event.product_id, func.count(func.distinct(Event.user_id)))
+        .where(
+            Event.user_id.in_(co_users),
+            Event.product_id.isnot(None),
+            Event.product_id.notin_(committed_ids | exclude),
+            Event.type.in_(COMMITTED_EVENTS),
+        )
+        .group_by(Event.product_id)
+        .order_by(func.count(func.distinct(Event.user_id)).desc())
+        .limit(top_n)
+    ).all()
+    return [(pid, float(count)) for pid, count in rows]
+
+
 def _cut_weak_hits(hits: list[tuple[int, float]]) -> list[tuple[int, float]]:
     """Drop kNN results that are only there because k had to be filled.
 
@@ -289,6 +331,7 @@ def retrieve(
     query_vector: np.ndarray | None = None,
     flt: Filter | None = None,
     exclude_ids: set[int] | None = None,
+    committed_ids: set[int] | None = None,
     top_n: int | None = None,
     mmr_lambda: float | None = None,
     pool_size: int | None = None,
@@ -312,17 +355,36 @@ def retrieve(
     if not fused:
         return RetrievalResult([], {"vector": 0, "lexical": 0, "fused": 0, "returned": 0})
 
+    # Collaborative filtering composes with the content-based fusion above rather than
+    # folding into rrf_fuse itself: that function is a well-tested two-list primitive
+    # (tests/test_unit.py::TestRrf), and generalizing its signature to N lists for a
+    # third leg used only some of the time isn't worth risking it. Instead: treat the
+    # vector+lexical result as one already-ranked list, and fuse *that* with the CF list.
+    # `ranking` stays literally `fused` — same dict, same object — when there's no CF
+    # signal, so a learner with no committed history gets byte-identical behaviour to
+    # before this leg existed.
+    cf_hits = _cf_hits(db, committed_ids or set(), exclude, pool_size) if committed_ids else []
+    ranking = fused
+    if cf_hits:
+        base_ranked = sorted(fused.items(), key=lambda kv: -kv[1]["fused"])
+        base_list = [(pid, entry["fused"]) for pid, entry in base_ranked]
+        ranking = rrf_fuse(base_list, cf_hits)
+
     products = {
-        p.id: p for p in db.scalars(select(Product).where(Product.id.in_(list(fused))))
+        p.id: p for p in db.scalars(select(Product).where(Product.id.in_(list(ranking))))
     }
 
     candidates: list[Candidate] = []
-    for product_id, entry in fused.items():
+    for product_id, entry in ranking.items():
         p = products.get(product_id)
         # A vector hit with no SQL row means the index is ahead of the database. Drop
         # it: recommending a product we cannot render is worse than recommending fewer.
         if p is None or not p.is_published or not _passes(p, flt, exclude):
             continue
+        # When CF ran, `entry` is the second-pass fusion (v/v_rank = the combined
+        # vector+lexical score, l/l_rank = the CF score) — the original per-leg
+        # vector/lexical numbers for display come from `fused` directly instead.
+        base = fused.get(product_id, {})
         candidates.append(
             Candidate(
                 product_id=p.id,
@@ -335,10 +397,12 @@ def retrieve(
                 spec=p.spec,
                 tags=list(p.tags or []),
                 description=p.description,
-                vector_score=round(entry["v"], 4),
-                lexical_score=round(entry["l"], 4),
-                vector_rank=entry["v_rank"],
-                lexical_rank=entry["l_rank"],
+                vector_score=round(base.get("v", 0.0), 4),
+                lexical_score=round(base.get("l", 0.0), 4),
+                vector_rank=base.get("v_rank", 0),
+                lexical_rank=base.get("l_rank", 0),
+                cf_score=round(entry.get("l", 0.0), 4) if cf_hits else 0.0,
+                cf_rank=(entry.get("l_rank", 0) if cf_hits else 0),
                 fused_score=round(entry["fused"], 6),
             )
         )
@@ -358,11 +422,12 @@ def retrieve(
         "query": query_text[:120],
         "vector": len(vector_hits),
         "lexical": len(lexical_hits),
+        "cf": len(cf_hits),
         "fused": len(fused),
         "after_filter": len(candidates),
         "returned": len(selected),
         "mmr_lambda": mmr_lambda,
-        "overlap": sum(1 for c in candidates if c.retrieved_by == "both"),
+        "overlap": sum(1 for c in candidates if c.retrieved_by == "vector+lexical"),
         "top": [
             {"id": c.product_id, "title": c.title[:40], "by": c.retrieved_by,
              "fused": c.fused_score, "final": c.final_score}
@@ -392,3 +457,18 @@ def popular(db: Session, top_n: int, exclude_ids: set[int] | None = None) -> lis
         for p in rows
         if p.id not in exclude
     ][:top_n]
+
+
+def impression_counts(db: Session, product_ids: list[int]) -> dict[int, int]:
+    """How many times each product has ever been shown in a recommendation, across all
+    users — the exposure signal behind ranking.apply_exploration_slot. Scoped to the
+    given candidate set rather than the whole catalogue, so this stays cheap regardless
+    of how much event history exists."""
+    if not product_ids:
+        return {}
+    rows = db.execute(
+        select(Event.product_id, func.count())
+        .where(Event.type == "rec_impression", Event.product_id.in_(product_ids))
+        .group_by(Event.product_id)
+    ).all()
+    return dict(rows)

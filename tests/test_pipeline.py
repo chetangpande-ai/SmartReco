@@ -13,6 +13,7 @@ from app.schemas import EventIn
 from app.services import profile as P
 from app.services import triggers as T
 from app.services.events import ingestor, to_row
+from app.services.retrieval import _cf_hits, retrieve
 
 
 class TestEventRow:
@@ -177,6 +178,76 @@ class TestEvidence:
         event_factory(uid, "dwell", product_id=catalog["SQL for Data Analysis"], dwell_ms=5_000)
         with session_scope() as db:
             assert not any("spent" in f for f in P.evidence(db, uid))
+
+    def test_pii_in_a_search_query_is_scrubbed_before_it_reaches_a_prompt(
+        self, catalog, user_factory, event_factory
+    ):
+        """`evidence()` output is interpolated directly into the grade/generate prompts —
+        anything a user typed into search reaches the model verbatim unless scrubbed here."""
+        uid = user_factory()
+        event_factory(uid, "search", query="contact me at bob@example.com about ML")
+        with session_scope() as db:
+            facts = P.evidence(db, uid)
+        assert not any("bob@example.com" in f for f in facts)
+        assert any("[redacted]" in f for f in facts)
+
+
+class TestCollaborativeFiltering:
+    def test_finds_co_occurring_products(self, catalog, user_factory, event_factory):
+        a = catalog["Deep Learning Specialization"]
+        b = catalog["Practical Deep Learning for Coders"]
+        u1, u2 = user_factory(), user_factory()
+        event_factory(u1, "enroll", product_id=a)
+        event_factory(u2, "enroll", product_id=a)
+        event_factory(u2, "enroll", product_id=b)
+        with session_scope() as db:
+            hits = _cf_hits(db, {a}, set(), 10)
+        assert hits and hits[0][0] == b
+
+    def test_empty_committed_ids_returns_nothing(self, catalog):
+        with session_scope() as db:
+            assert _cf_hits(db, set(), set(), 10) == []
+
+    def test_excludes_already_committed_products(self, catalog, user_factory, event_factory):
+        a = catalog["Deep Learning Specialization"]
+        b = catalog["Practical Deep Learning for Coders"]
+        u1, u2 = user_factory(), user_factory()
+        event_factory(u1, "enroll", product_id=a)
+        event_factory(u2, "enroll", product_id=a)
+        event_factory(u2, "enroll", product_id=b)
+        with session_scope() as db:
+            # b passed in as already-committed too, even though it co-occurs with a
+            hits = _cf_hits(db, {a, b}, set(), 10)
+        assert b not in [pid for pid, _ in hits]
+
+    def test_retrieve_with_no_committed_ids_is_unchanged(self, catalog):
+        """Regression guard: the common case — no history yet — must be byte-identical
+        to retrieval behaviour before the CF leg existed."""
+        with session_scope() as db:
+            without = retrieve(db, query_text="deep learning neural networks", top_n=5)
+            with_none = retrieve(
+                db, query_text="deep learning neural networks", committed_ids=None, top_n=5
+            )
+            with_empty = retrieve(
+                db, query_text="deep learning neural networks", committed_ids=set(), top_n=5
+            )
+        ids = [c.product_id for c in without.candidates]
+        assert ids == [c.product_id for c in with_none.candidates]
+        assert ids == [c.product_id for c in with_empty.candidates]
+
+    def test_retrieve_surfaces_the_cf_leg(self, catalog, user_factory, event_factory):
+        a = catalog["Deep Learning Specialization"]
+        b = catalog["Practical Deep Learning for Coders"]
+        u1, u2 = user_factory(), user_factory()
+        event_factory(u1, "enroll", product_id=a)
+        event_factory(u2, "enroll", product_id=a)
+        event_factory(u2, "enroll", product_id=b)
+        with session_scope() as db:
+            result = retrieve(db, query_text="deep learning", committed_ids={a}, top_n=10)
+        hit = next((c for c in result.candidates if c.product_id == b), None)
+        assert hit is not None
+        assert hit.cf_rank > 0
+        assert "cf" in hit.retrieved_by
 
 
 class TestDrift:

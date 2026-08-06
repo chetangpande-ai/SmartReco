@@ -260,6 +260,9 @@ class AgentRun(Base):
     status: Mapped[str] = mapped_column(String(16), default="ok")  # ok | error | skipped
     node_path: Mapped[list] = mapped_column(JSON, default=list)
     retrieval_stats: Mapped[dict] = mapped_column(JSON, default=dict)
+    # {"grade": "v1", "generate": "v1"} — which prompts.py constant produced this run's
+    # copy. Nullable because rows written before this column existed have none.
+    prompt_versions: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     grade_score: Mapped[float] = mapped_column(Float, default=0.0)
     refine_loops: Mapped[int] = mapped_column(Integer, default=0)
 

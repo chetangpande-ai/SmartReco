@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Support & FAQ — SmartReco{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <h1>Support &amp; FAQ</h1>
+  <p class="lede">How SmartReco decides what to show you, what it tracks, and what it
+     will never do.</p>
+</section>
+
+<div class="faq">
+  <h2 class="section-title">Recommendations</h2>
+
+  <details class="faq-item panel">
+    <summary>Why am I seeing these specific courses?</summary>
+    <p>Every recommendation is built from the "Why these?" evidence panel on your
+       <a href="/me">My picks</a> page — the exact list of things you actually did
+       (searched, viewed, spent time on, saved) that the agent was allowed to use. It
+       never recommends based on anything you didn't do.</p>
+  </details>
+
+  <details class="faq-item panel">
+    <summary>Why did my interests seem to "reset"?</summary>
+    <p>Interest scores decay with a 48-hour half-life — something you looked at
+       yesterday still counts, but it counts less than something you looked at five
+       minutes ago. That's deliberate: it keeps recommendations reflecting what you're
+       into right now rather than getting stuck on a single old session.</p>
+  </details>
+
+  <details class="faq-item panel">
+    <summary>What does the "confidence" percentage mean?</summary>
+    <p>It's a blend of how many of the requested picks actually survived grounding and
+       quality checks, and how well the retrieved courses matched your profile. A lower
+       number usually means fewer strong matches were found, not that something is
+       wrong — you'll still only ever see courses that genuinely fit.</p>
+  </details>
+
+  <details class="faq-item panel">
+    <summary>Why does refreshing sometimes take a few seconds, and sometimes nothing changes?</summary>
+    <p>Building a recommendation involves real retrieval and reasoning, so it isn't
+       instant. It also won't re-run needlessly — if your interests haven't meaningfully
+       changed since your last refresh, you'll get the same recommendation back instead
+       of spending a call to say the same thing twice.</p>
+  </details>
+
+  <h2 class="section-title">Trust &amp; privacy</h2>
+
+  <details class="faq-item panel">
+    <summary>Can I trust the prices and claims in a recommendation?</summary>
+    <p>Yes — every price, course fact, and syllabus detail shown to you comes directly
+       from the catalogue. Recommendations are never allowed to invent a discount,
+       a deadline, a guarantee, or an outcome ("guaranteed job," "master this
+       overnight," and similar claims are automatically blocked before anything ships to
+       you), regardless of what a course description might otherwise tempt a model to
+       say.</p>
+  </details>
+
+  <details class="faq-item panel">
+    <summary>What activity is tracked, and why?</summary>
+    <p>Searches, clicks, page views, dwell time, and course saves/enrollments — the
+       same signals shown back to you in the evidence panel. It exists solely to build
+       your recommendations; nothing is sold or shared, and personal details you type
+       into search (like an email address) are stripped out before they're used to
+       generate anything.</p>
+  </details>
+
+  <h2 class="section-title">Accounts</h2>
+
+  <details class="faq-item panel">
+    <summary>What's the difference between a learner and an admin account?</summary>
+    <p>A learner account browses courses and gets recommendations. An admin account can
+       additionally manage the course catalogue and see the Operations dashboard —
+       system health, agent activity, and cost/efficiency stats. Admin access doesn't
+       change what recommendations you personally see.</p>
+  </details>
+</div>
+{% endblock %}

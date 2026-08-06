@@ -253,6 +253,7 @@ def _record_run(
                 status=status,
                 node_path=final.get("node_path", []),
                 retrieval_stats=final.get("retrieval_stats", {}),
+                prompt_versions=final.get("prompt_versions", {}),
                 grade_score=float(final.get("grade_score", 0.0)),
                 refine_loops=int(final.get("refine_count", 0)),
                 prompt_tokens=int(final.get("prompt_tokens", 0)),

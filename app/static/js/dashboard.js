@@ -33,3 +33,16 @@
 
   setTimeout(poll, delay);
 })();
+
+/* tracker.js already records the "dismiss" event via its delegated click listener
+   (data-track-click) — this just gives the user immediate visual feedback rather than
+   waiting for the next page load to notice the course is gone. */
+(function () {
+  "use strict";
+  document.addEventListener("click", function (e) {
+    var btn = e.target.closest(".card-dismiss");
+    if (!btn) return;
+    var card = btn.closest(".card-rec");
+    if (card) card.classList.add("is-dismissed");
+  });
+})();

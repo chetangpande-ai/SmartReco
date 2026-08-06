@@ -11,6 +11,13 @@ says. It is also blunt about outcomes, because a learning platform is exactly wh
 persuasive model reaches for "land a six-figure job" — a claim nobody can make.
 """
 
+# Bump whenever the corresponding SYSTEM prompt's wording changes enough that historical
+# eval scores (scripts/eval_generation.py) stop being comparable across the edit. Recorded
+# per run on AgentRun.prompt_versions so a quality shift can be traced to the prompt that
+# caused it.
+GRADE_PROMPT_VERSION = "v1"
+GENERATE_PROMPT_VERSION = "v1"
+
 GRADE_SYSTEM = """You judge whether a set of retrieved courses actually matches what a learner has been studying.
 
 You are grading retrieval quality, not writing marketing copy. Be strict: if the

@@ -50,6 +50,10 @@ dependencies = [
 guardrails = ["nemoguardrails>=0.23"]
 # SES email delivery for the AWS deployment path.
 aws = ["boto3>=1.43"]
+# RAG metrics + custom GEval rubrics for scripts/eval_generation.py and
+# scripts/red_team.py. Routed through Mesh via app/services/eval_llm.py, so this never
+# bypasses the budget cap or circuit breaker — it just costs real tokens when run.
+evals = ["deepeval>=2.0"]
 
 [dependency-groups]
 dev = [

@@ -41,6 +41,11 @@ def search(request: Request, q: str = "", db: Session = Depends(get_db)):
     return render(request, "search.html", products=products, query=query)
 
 
+@router.get("/support")
+def support(request: Request):
+    return render(request, "support.html")
+
+
 @router.get("/products/{slug}")
 def product_detail(request: Request, slug: str, db: Session = Depends(get_db)):
     product = db.scalar(select(Product).where(Product.slug == slug))

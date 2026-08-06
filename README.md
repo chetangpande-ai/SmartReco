@@ -42,7 +42,7 @@ honesty* before anyone sees it.
 ## Key features
 
 **Behaviour capture that cannot slow the page down**
-- Twelve signal types: `page_view` · `product_view` · `product_click` · `search` · `search_result_click` · `filter` · `scroll_depth` (25/50/75/100) · `dwell` · `wishlist` · `enroll` · `rec_impression` · `rec_click` — a click *from search results* is a different, higher-intent event than a click from a browse tile, and is weighted accordingly
+- Thirteen signal types: `page_view` · `product_view` · `product_click` · `search` · `search_result_click` · `filter` · `scroll_depth` (25/50/75/100) · `dwell` · `wishlist` · `enroll` · `rec_impression` · `rec_click` · `dismiss` — a click *from search results* is a different, higher-intent event than a click from a browse tile, and is weighted accordingly. `dismiss` ("not interested") is pinned at zero weight by construction — it suppresses, it never scores as interest
 - Batched at 20 events or 5 s; scroll throttled, search debounced; `sendBeacon` on unload so the final dwell is never lost
 - **p50 3.0 ms** for a page's worth of events — less than rendering the page itself
 - `localStorage` spill-over retries through 429s and 5xx; every event carries an idempotency key
@@ -58,10 +58,22 @@ honesty* before anyone sees it.
 - **recall@1 0.95 · recall@5 1.00 · MRR 0.975** over 20 paraphrase probes
 - **Groundedness verifier**: a recommended id that was never offered is dropped and the draft repaired
 
+**Ranking that learns beyond one person's history**
+- **Item-to-item collaborative filtering** as a third retrieval leg, fused in via a second RRF pass alongside vector⊕lexical — "learners who enrolled in what you enrolled in also enrolled in these." A learner with no history yet gets provably byte-identical behaviour to before this leg existed
+- **A deterministic heuristic ranker** (`app/agent/ranking.py`) scores every candidate from data already in memory — no new query — and skips the LLM grading call outright when it's confident, recorded as `grade_skipped_heuristic_confident` in `/admin`'s call-efficiency panel. Hand-weighted, not trained: there's no labelled outcome data at this catalogue's scale to fit weights from, and the docs say so
+- **A bandit-style exploration slot** — with probability `EXPLORE_EPSILON` (15% default), one recommendation slot goes to a genuinely under-shown course instead of the ranker's actual top pick, so the same best-guess set can't compound its own popularity forever
+- **"Not interested"** on any recommended card — suppressed from every future recommendation, including the cold-start path (`popular()` already supported `exclude_ids`; `coldstart()` just wasn't passing it — fixed alongside this)
+
 **Copy that is persuasive *and* checkable**
 - Cites only `evidence()` — concrete facts about what the learner actually did, shown to them as "Why these?"
 - **35 deterministic checks** — 31 regex rails plus discount, catalogue-price, PII and length cross-checks — block job guarantees, invented statistics, fake scarcity and prices that aren't in the catalogue. Always on, free, offline, in CI
 - Returns **fewer** than `REC_TOP_K` rather than padding with a filler
+
+**Measured and red-teamed, not just guardrailed**
+- DeepEval RAG metrics (faithfulness, answer relevancy) plus a custom GEval rubric mirrored line-for-line from the generation prompt's hard rules — `make eval-llm`
+- Adversarial probes against the real `generate → verify` path — prompt injection via a search query, a fake system-role marker, a compromised catalogue description, a roleplay jailbreak — `make red-team`, **4/4 blocked** in a live run
+- PII is scrubbed on the **input** side (search queries, before they reach a prompt), not just checked on the way out
+- Every run records which prompt version produced it (`AgentRun.prompt_versions`), so a quality shift traces back to the prompt that caused it — see [`docs/evals.md`](docs/evals.md)
 
 **Spending that is deliberate**
 - **11 trigger gates**, cheapest-first, each recording why it skipped
@@ -70,9 +82,10 @@ honesty* before anyone sees it.
 
 **Operable**
 - **LangSmith** traces the graph with Mesh calls nested as real `llm` runs; **Logfire** traces the request around it; one run reaches both through LangSmith's OTel bridge — all verified against live projects
-- `/admin` shows sync health, LLM calls avoided and why, the compiled graph, and every run's node path, tokens, cost and latency
+- `/admin` shows sync health, LLM calls avoided and why, the compiled graph, every run's node path, prompt versions, tokens, cost and latency
 - APScheduler daily digest, idempotent per `digest:<user>:<date>`
-- **314 tests**, 90% coverage, hermetic and free — `LLM_ENABLED=false` runs everything offline
+- **329 tests**, 90% coverage, hermetic and free — `LLM_ENABLED=false` runs everything offline
+- A [Support / FAQ page](app/templates/support.html) (`/support`) and [four docs](#documentation) covering architecture, low-level design, the full feature inventory and the evals/PII/red-teaming setup
 
 ---
 
@@ -138,14 +151,22 @@ mocked out, and it spends nothing. That's the mode the whole test suite runs in.
    page for a minute.
 2. Open **`/me`** — the agent reads that behaviour and writes a recommendation.
    The *"Why these?"* panel lists the only facts it was allowed to cite.
-3. Open **`/admin`** — SQL↔vector sync health, LLM calls avoided and why, the compiled
-   agent graph, and every run with its node path, tokens, cost and latency.
-4. Press **"Run digest now"** — the daily email renders to `data/outbox/*.html`.
+3. Click **"Not interested"** on a card — it fades immediately and never comes back,
+   including if you refresh into the cold-start path.
+4. Open **`/admin`** — SQL↔vector sync health, LLM calls avoided and why (now including
+   `grade_skipped_heuristic_confident` runs), the compiled agent graph, and every run
+   with its node path, prompt versions, tokens, cost and latency.
+5. Press **"Run digest now"** — the daily email renders to `data/outbox/*.html`.
+6. Open **`/support`** for the FAQ — what's tracked, how recommendations are built, and
+   what the app will never claim.
 
 The catalogue is 35 real courses across AI/ML, web dev, data, cloud, security, design,
 product and career — from Andrew Ng's specialisations to Karpathy's Zero to Hero to
 OSCP. Deliberately recognisable, so you can judge for yourself whether a recommendation
-makes sense instead of taking it on trust.
+makes sense instead of taking it on trust. `make seed` also generates 24 synthetic
+learners with realistic, clustered enrollment patterns — purely so the collaborative-
+filtering leg has real cross-user signal to work with from a fresh clone, never meant to
+be logged into.
 
 ---
 
@@ -339,6 +360,10 @@ token-bucket rate limiting; CSP and security headers.
 | ➕ **Guardrails** | Deterministic rails always on (free, offline); NeMo Guardrails as an opt-in second layer, routed through Mesh |
 | ➕ **Two vector backends** | Chroma locally, Pinecone when deployed, behind one 7-method protocol. **Both verified against live indexes** — identical recall on the same 20 probes, one env var apart |
 | ➕ **Offline eval harness** | 20 paraphrase probes, recall@k + MRR, `make eval` |
+| ➕ **Generation-quality evals** | DeepEval RAG metrics + a custom GEval rubric against the real `generate()` output, routed through Mesh, `make eval-llm` |
+| ➕ **Adversarial red-teaming** | Prompt-injection probes against the live `generate → verify` path (`make red-team`, **4/4 blocked**), plus hermetic no-LLM adversarial tests that run in every CI build |
+| ➕ **Prompt versioning** | `AgentRun.prompt_versions` — every run records which prompt version wrote it, visible in `/admin/agent-runs` |
+| ➕ **Input-side PII scrubbing** | Search-query text is redacted before it reaches a prompt (`app/services/pii.py`), not just checked on the way out |
 
 ---
 
@@ -428,6 +453,52 @@ access"** — a rail on that phrase would reject the model for quoting the catal
 correctly. The rails forbid only what the catalogue cannot support, never what it does,
 and a test pins both directions.
 
+### Evals, prompt versioning and red-teaming — measured, not assumed
+
+Guardrails prove *known* bad patterns are blocked. They don't answer "is this prompt
+actually behaving," which needs a judge, or "does this hold up against someone trying to
+break it," which needs an attacker. Both were added, both run for real, not just wired.
+
+**DeepEval, not DeepEval-and-RAGAs.** `GEval` — DeepEval's implementation of the
+custom-rubric-as-LLM-judge pattern — is also where DeepEval's own RAG metrics
+(`FaithfulnessMetric`, `AnswerRelevancyMetric`) live, so one dependency covers both
+"measure faithfulness the way RAGAs would" and "grade against our own rubric" instead of
+two. Routed through `MeshDeepEvalModel` (`app/services/eval_llm.py`), so an eval run
+still hits the same budget cap and `/metrics` counters a real recommendation would.
+
+The custom rubric's five criteria are copied from `GENERATE_SYSTEM`'s HARD RULES, on
+purpose — when the prompt changes, the rubric is what says whether the change helped.
+One real run, three scenarios, `gpt-4o-mini` on both sides:
+
+```
+ml_progression:    Faithfulness 1.00   AnswerRelevancy 1.00   grounded_persuasion 0.40
+web_fundamentals:  Faithfulness 0.88   AnswerRelevancy 0.78   grounded_persuasion 0.30
+data_engineering:  Faithfulness 1.00   AnswerRelevancy 1.00   grounded_persuasion 0.60
+```
+
+`web_fundamentals` scoring lower is the harness working: the judge's reason named a
+specific unsupported claim in the model's narrative — the same failure class `verify()`
+catches downstream, caught one stage earlier.
+
+**Red-teaming targets the real attack surface, not a hypothetical one.** A search query
+is quoted verbatim into `evidence()`, which is quoted verbatim into the prompt — so a
+search box is a prompt-injection vector. `scripts/red_team.py` runs four probes (injection
+via search query, a fake system-role marker, an injected catalogue description, a
+roleplay jailbreak) through the real `generate → verify → finalize` path with a real
+model. **4/4 blocked** on `gpt-4o-mini` — not because the model always refuses, but
+because `verify()`/`guardrails` catch whatever gets through either way. Hermetic versions
+of the same idea (`tests/test_agent.py::TestAdversarialGeneration`, expanded
+`TestGuardrails` cases) stub the model response and run in every CI build, no key needed.
+
+**PII had an input-side gap.** The output-side check (`guardrails.check_copy`) always
+existed; nothing scrubbed a user's own search text before it reached a prompt. Typing an
+email into search flowed unredacted through `profile.evidence()` into the model's
+context — the output check would only have caught it if the model happened to echo it
+back. `app/services/pii.py` closes that at the point raw text becomes prompt content, not
+at ingestion, so a user's own event history stays intact.
+
+Full writeup: [`docs/evals.md`](docs/evals.md).
+
 ### Recommending fewer than four
 
 Retrieval always returns a full slate, so a narrow interest gets padded with whatever
@@ -495,24 +566,32 @@ without reading logs — the question you ask once the demo is already running.
 ## Testing
 
 ```bash
-make test     # 314 tests, offline, no API key, spends nothing
-make cov      # coverage report (90%)
-make eval     # retrieval quality against 20 paraphrase probes
+make test      # 329 tests, offline, no API key, spends nothing
+make cov       # coverage report (90%)
+make eval      # retrieval quality against 20 paraphrase probes
+make eval-llm  # DeepEval RAG metrics + custom rubric on real generate() output (costs tokens)
+make red-team  # adversarial prompt-injection probes (costs tokens)
 ```
 
 Without `make` (Windows): `uv run pytest tests/ -q`, add `--cov=app --cov-report=term-missing`
-for `cov`, or `uv run python scripts/eval_retrieval.py` for `eval`.
+for `cov`, `uv run python scripts/eval_retrieval.py` for `eval`, or
+`uv run python scripts/eval_generation.py` / `uv run python scripts/red_team.py` for the
+two above.
 
 | Module | Covers |
 |---|---|
-| `test_unit.py` | passwords, JWT, CSRF, JSON extraction, guardrails, BM25, RRF, MMR |
+| `test_unit.py` | passwords, JWT, CSRF, JSON extraction, guardrails (including prompt-injection-shaped adversarial cases), PII detection/scrubbing, BM25, RRF, MMR |
 | `test_mesh.py` | Mesh gateway against a stub: retries, breaker, budget, parameter negotiation, the empty-completion trap |
 | `test_storage.py` | embedding cache, both vector backends, dual-write, outbox retry + dead-letter, all three drift classes |
-| `test_pipeline.py` | ingest, dedupe, decay, evidence, drift, signature, **all 11 trigger gates** |
-| `test_agent.py` | graph shape, groundedness verifier, repair bounding, end-to-end |
+| `test_pipeline.py` | ingest, dedupe, decay, evidence (including PII scrubbing before it reaches a prompt), drift, signature, **all 11 trigger gates** |
+| `test_agent.py` | graph shape, groundedness verifier, repair bounding, adversarial generation (stubbed model hallucinating a pick / injecting hype), end-to-end |
 | `test_digest.py` | audience, rendering, once-only delivery, SMTP send path, scheduler |
 | `test_api.py` | HTTP: auth, CSRF, tracking ingest, admin access control, dual-write over HTTP |
 | `test_observability.py` | sink selection, the OTel bridge, and the two silent failure modes below |
+
+`make eval-llm` and `make red-team` need a real `MESHAPI_API_KEY` and are not run in
+CI — same trade-off `make eval`/`make sweep` already make for retrieval quality, extended
+to generation quality and adversarial robustness. See [`docs/evals.md`](docs/evals.md).
 
 Several tests are explicitly labelled regressions for bugs found during the build — an
 unpublished course staying recommendable, a search-only learner getting no interest
@@ -625,11 +704,27 @@ that path is now one someone has actually walked.
 
 ---
 
+## Documentation
+
+This README covers the what-and-why with evidence inline. Four docs go one level
+deeper, written to stay in sync with it rather than duplicate it — they link back here
+for exact counts instead of restating them:
+
+| Doc | Covers |
+|---|---|
+| [`docs/architecture.md`](docs/architecture.md) | System components, the request path, and short-term (`AgentState`) vs. long-term (`UserProfile`) context management |
+| [`docs/low-level-design.md`](docs/low-level-design.md) | Module-by-module internals: the accumulator-reducer mechanic, the graph's branch conditions, the decay math, the trigger cascade, Mesh's state machines |
+| [`docs/features.md`](docs/features.md) | One canonical feature inventory — learner-facing, admin-facing, responsible-AI, platform |
+| [`docs/evals.md`](docs/evals.md) | DeepEval integration, the custom GEval rubric, prompt versioning, PII scrubbing, red-teaming — full detail behind the "Evals, prompt versioning and red-teaming" section above |
+| [`docs/demo-script.md`](docs/demo-script.md) | A shot-by-shot script for recording a walkthrough video against the real running app |
+
+---
+
 ## Stack
 
 FastAPI · SQLAlchemy 2 · SQLite/Postgres · Alembic · **Mesh API** (all model traffic) ·
 LangChain 1.3 · LangGraph 1.2 · LangSmith · Logfire/OpenTelemetry · Chroma · Pinecone ·
-NeMo Guardrails · APScheduler · Jinja2 · vanilla JS · uv · pytest · ruff · Docker
+NeMo Guardrails · DeepEval · APScheduler · Jinja2 · vanilla JS · uv · pytest · ruff · Docker
 
 Code style follows [Andrej Karpathy's engineering philosophy](.claude/skills/karpathy-coding-style/SKILL.md);
 see [AGENTS.md](AGENTS.md).

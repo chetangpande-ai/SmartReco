@@ -27,8 +27,10 @@ import numpy as np
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app import metrics
 from app.config import settings
 from app.models import Event, Product, UserProfile, ensure_utc, utcnow
+from app.services import pii
 from app.services.embeddings import embedder
 from app.services.retrieval import tokenize
 
@@ -54,8 +56,15 @@ EVENT_WEIGHTS = {
     "scroll_depth": 0.25,
     "page_view": 0.15,
     "rec_impression": 0.05,
+    # Explicit and pinned at zero rather than left to the 0.1 default below — a "not
+    # interested" click must never register as mild positive interest.
+    "dismiss": 0.0,
 }
 COMMITTED_EVENTS = ("enroll", "purchase", "wishlist", "add_to_cart")
+
+# Kept separate from COMMITTED_EVENTS: that tuple also drives EVENT_WEIGHTS-based
+# interest scoring above, and a dismissal is a suppression signal, not an interest one.
+DISMISSED_EVENTS = ("dismiss",)
 
 
 def _dwell_weight(dwell_ms: int) -> float:
@@ -285,7 +294,7 @@ def summarise(profile: UserProfile) -> str:
     cats = ", ".join(f"{k} ({v:.1f})" for k, v in list(profile.interests.items())[:3])
     bits = [f"studying: {cats}"]
     if profile.recent_queries:
-        bits.append(f"searched: {'; '.join(profile.recent_queries[:3])}")
+        bits.append(f"searched: {'; '.join(pii.scrub_pii(q) for q in profile.recent_queries[:3])}")
     if profile.brand_scores:
         bits.append(f"providers looked at: {', '.join(list(profile.brand_scores)[:3])}")
     if profile.tier_affinity:
@@ -341,8 +350,10 @@ def evidence(db: Session, user_id: int, limit: int = 8) -> list[str]:
 
     facts: list[str] = list(intents)
     for query, count in sorted(searches.items(), key=lambda kv: -kv[1])[:3]:
+        if pii.contains_pii(query):
+            metrics.inc("smartreco_pii_queries_detected_total")
         facts.append(
-            f"searched for '{query}'" + (f" {count} times" if count > 1 else "")
+            f"searched for '{pii.scrub_pii(query)}'" + (f" {count} times" if count > 1 else "")
         )
     for title, ms in sorted(dwell.items(), key=lambda kv: -kv[1])[:3]:
         if ms >= 20_000:

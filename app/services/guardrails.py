@@ -23,6 +23,7 @@ import re
 from dataclasses import dataclass, field
 
 from app.config import settings
+from app.services.pii import _EMAIL, _PHONE
 
 log = logging.getLogger(__name__)
 
@@ -102,8 +103,6 @@ _UNSUPPORTED_COMMERCE = [
 
 _DISCOUNT = re.compile(r"\b(\d{1,2})%\s*(off|discount)|\bsave\s+\$?\d+|\bhalf[- ]price\b", re.I)
 _PRICE = re.compile(r"\$\s?(\d[\d,]*)(?:\.(\d{2}))?")
-_EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
-_PHONE = re.compile(r"\+?\d[\d\s().-]{8,}\d")
 
 
 def check_copy(

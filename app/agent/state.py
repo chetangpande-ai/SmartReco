@@ -23,6 +23,12 @@ class AgentState(TypedDict, total=False):
     filters: dict
     evidence: list[str]  # the concrete behaviours the copy is allowed to cite
     strategy: str  # agentic | coldstart | fallback
+    # Structured UserProfile fields (interests, tag_scores, brand_scores,
+    # price_affinity_cents, tier_affinity), read once in analyze() while its DB session
+    # is still open. profile_summary/evidence above are the string-rendered forms the
+    # LLM prompts use; this is the numeric form app/agent/ranking.py's heuristic scorer
+    # needs, threaded through state instead of a second query at grade() time.
+    profile_features: dict
 
     # ---- retrieve / grade / refine
     candidates: list[dict]
@@ -48,6 +54,12 @@ class AgentState(TypedDict, total=False):
     prompt_tokens: Annotated[int, add]
     completion_tokens: Annotated[int, add]
     cost_usd: Annotated[float, add]
+
+    # Which prompt version each token-spending node used, e.g. {"grade": "v1", "generate":
+    # "v1"}. Not an operator.add accumulator — dicts don't support `+` — so grade/generate
+    # must merge against the incoming state themselves (dict.update, not overwrite) or a
+    # second pass through the refine/repair loop drops the other node's entry.
+    prompt_versions: dict[str, str]
 
     # ---- terminal
     model: str
@@ -77,4 +89,6 @@ def new_state(user_id: int, trigger: str, request_id: str, top_k: int) -> AgentS
         filters={},
         error="",
         model="",
+        prompt_versions={},
+        profile_features={},
     )

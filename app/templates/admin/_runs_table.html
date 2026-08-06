@@ -2,7 +2,7 @@
 <table class="data">
   <thead>
     <tr>
-      <th>When</th><th>User</th><th>Trigger</th><th>Path</th>
+      <th>When</th><th>User</th><th>Trigger</th><th>Path</th><th>Prompt</th>
       <th class="num">Grade</th><th class="num">Refines</th>
       <th class="num">Calls</th><th class="num">Tokens</th><th class="num">Cost</th>
       <th class="num">ms</th><th>Status</th>
@@ -15,6 +15,10 @@
       <td class="small">{{ r.user_id }}</td>
       <td><span class="pill pill-plain">{{ r.trigger }}</span></td>
       <td class="mono small">{{ r.node_path|join('→') }}</td>
+      <td class="small">
+        {% if r.prompt_versions %}{{ r.prompt_versions.items()|map('join', ' ')|join(' · ') }}
+        {% else %}<span class="muted">—</span>{% endif %}
+      </td>
       <td class="num">{{ '%.2f'|format(r.grade_score) }}</td>
       <td class="num">{{ r.refine_loops }}</td>
       <td class="num">{{ r.llm_calls }}</td>
@@ -28,7 +32,7 @@
       </td>
     </tr>
   {% else %}
-    <tr><td colspan="11" class="muted">No agent runs yet.</td></tr>
+    <tr><td colspan="12" class="muted">No agent runs yet.</td></tr>
   {% endfor %}
   </tbody>
 </table>

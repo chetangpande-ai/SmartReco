@@ -34,6 +34,12 @@ eval:  ## Measure retrieval quality against the probe set
 sweep:  ## Tune the retrieval relevance floor
 	uv run python scripts/eval_retrieval.py --sweep
 
+eval-llm:  ## DeepEval RAG metrics + custom rubric on generated copy (costs tokens)
+	uv run python scripts/eval_generation.py
+
+red-team:  ## Adversarial prompt-injection probes against generate->verify (costs tokens)
+	uv run python scripts/red_team.py
+
 migrate:  ## Apply database migrations
 	uv run alembic upgrade head
 

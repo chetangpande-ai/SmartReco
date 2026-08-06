@@ -26,6 +26,10 @@ EVENT_TYPES = frozenset(
         "purchase",
         "rec_impression",
         "rec_click",
+        # Explicit negative feedback: "not interested" on a recommended card. Never
+        # scored as positive interest (profile.EVENT_WEIGHTS pins it at 0.0) — it only
+        # ever suppresses a product from future candidate sets.
+        "dismiss",
     }
 )
 

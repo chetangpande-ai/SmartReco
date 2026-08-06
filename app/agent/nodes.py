@@ -16,7 +16,7 @@ import re
 
 from sqlalchemy import select
 
-from app.agent import prompts
+from app.agent import prompts, ranking
 from app.agent.state import AgentState
 from app.config import settings
 from app.db import session_scope
@@ -24,7 +24,7 @@ from app.models import Event, Product, UserProfile
 from app.services import guardrails
 from app.services import profile as profile_service
 from app.services.mesh import MeshError, mesh
-from app.services.retrieval import popular, retrieve
+from app.services.retrieval import impression_counts, popular, retrieve
 from app.services.vectorstore import Filter
 
 log = logging.getLogger(__name__)
@@ -91,6 +91,20 @@ def analyze(state: AgentState) -> dict:
             ).all()
         }
 
+        # Or something they explicitly said "not interested" to. Kept as a separate
+        # query from `committed` (rather than one combined `.in_()` over both tuples)
+        # because the two mean different things even though both end up excluded here.
+        dismissed = {
+            pid
+            for (pid,) in db.execute(
+                select(Event.product_id).where(
+                    Event.user_id == state["user_id"],
+                    Event.type.in_(profile_service.DISMISSED_EVENTS),
+                    Event.product_id.isnot(None),
+                )
+            ).all()
+        }
+
         # Level filter as a progression signal: someone consistently opening advanced
         # material has outgrown the introductory shelf, and vice versa. Always spans two
         # rungs, because the next step up is exactly what a learner wants recommended.
@@ -107,7 +121,23 @@ def analyze(state: AgentState) -> dict:
         filters = {
             "tiers": tiers,
             "max_price_cents": max_price,
-            "exclude_ids": sorted(committed),
+            "exclude_ids": sorted(committed | dismissed),
+            # Feeds the collaborative-filtering retrieval leg (retrieval._cf_hits) —
+            # separate from exclude_ids, which is what should never be re-shown, not
+            # what CF should reason from.
+            "committed_ids": sorted(committed),
+        }
+
+        # The numeric form of the profile, for ranking.heuristic_score() at grade()
+        # time — read here while the session is still open, not queried again later.
+        # `dict(...)` copies rather than aliases: `prof` becomes detached the moment
+        # this `with` block ends, and its JSON columns would raise on next access.
+        profile_features = {
+            "interests": dict(prof.interests),
+            "tag_scores": dict(prof.tag_scores),
+            "brand_scores": dict(prof.brand_scores),
+            "price_affinity_cents": prof.price_affinity_cents,
+            "tier_affinity": prof.tier_affinity,
         }
 
     log.debug("analyzed", extra={"query": query[:80], "facts": len(facts)})
@@ -115,6 +145,7 @@ def analyze(state: AgentState) -> dict:
         "node_path": ["analyze"],
         "profile_summary": summary,
         "evidence": facts,
+        "profile_features": profile_features,
         "query": query,
         "filters": filters,
     }
@@ -140,6 +171,7 @@ def retrieve_node(state: AgentState) -> dict:
         max_price_cents=f.get("max_price_cents"),
     )
     exclude = set(f.get("exclude_ids") or [])
+    committed = set(f.get("committed_ids") or [])
 
     with session_scope() as db:
         result = retrieve(
@@ -147,6 +179,7 @@ def retrieve_node(state: AgentState) -> dict:
             query_text=state["query"],
             flt=flt,
             exclude_ids=exclude,
+            committed_ids=committed,
             top_n=max(state["top_k"] * 2, 8),
         )
     return {
@@ -160,8 +193,12 @@ def retrieve_node(state: AgentState) -> dict:
 def coldstart(state: AgentState) -> dict:
     """No usable behaviour yet. Recommend what the catalogue itself rates highest
     rather than inventing an interest the user has not expressed."""
+    # analyze() may still have computed committed/dismissed exclusions even when it
+    # routed here (e.g. a profile with no query signal yet) — popular() already
+    # supports exclude_ids, it just wasn't being passed before.
+    exclude = set((state.get("filters") or {}).get("exclude_ids") or [])
     with session_scope() as db:
-        top = popular(db, state["top_k"])
+        top = popular(db, state["top_k"], exclude_ids=exclude)
     return {
         "node_path": ["coldstart"],
         "strategy": "coldstart",
@@ -172,7 +209,9 @@ def coldstart(state: AgentState) -> dict:
 
 # --------------------------------------------------------------------------- 4
 def grade(state: AgentState) -> dict:
-    """LLM-as-judge on retrieval quality, doubling as a re-ranker.
+    """LLM-as-judge on retrieval quality, doubling as a re-ranker — unless the
+    deterministic heuristic ranker (app/agent/ranking.py) is already confident, in which
+    case the LLM call is skipped outright.
 
     Grading and re-ranking are one call because they need identical context. Splitting
     them would double the spend to answer two halves of the same question.
@@ -181,14 +220,39 @@ def grade(state: AgentState) -> dict:
     if not candidates:
         return {"node_path": ["grade"], "grade_score": 0.0, "grade_notes": "no candidates"}
 
+    # The heuristic score reorders `candidates` unconditionally, before anything below
+    # touches it — this is what makes it "a lightweight tiebreaker on top of the LLM's
+    # ranked_ids ordering" even when the LLM does run: any id the LLM's ranked_ids
+    # omits falls back to heuristic order, not arbitrary retrieval order.
+    profile_features = state.get("profile_features") or {}
+    heuristic_scores = {
+        c["product_id"]: ranking.heuristic_score(c, profile_features) for c in candidates
+    }
+    candidates = sorted(candidates, key=lambda c: -heuristic_scores[c["product_id"]])
+    margin = ranking.confidence_margin(sorted(heuristic_scores.values(), reverse=True))
+
     if not mesh.available:
-        # Without a model we cannot judge, so we accept the deterministic ranking as-is
+        # Without a model we cannot judge, so we accept the heuristic ranking as-is
         # rather than blocking the whole recommendation on an unavailable grader.
         return {
             "node_path": ["grade"],
             "grade_score": 0.7,
             "grade_notes": "grading skipped (llm unavailable)",
             "warnings": ["grade_skipped"],
+            "candidates": candidates,
+        }
+
+    if margin >= settings.ranker_skip_margin:
+        # The heuristic's top pick clearly separates from the rest — paying for an LLM
+        # call to confirm what's already obvious is exactly the spending this project's
+        # trigger policy exists to avoid one level up; this is the same idea one level
+        # down, inside a single recommendation.
+        return {
+            "node_path": ["grade"],
+            "grade_score": round(min(1.0, 0.5 + margin), 3),
+            "grade_notes": f"heuristic ranker confident (margin {margin:.2f}); LLM grading skipped",
+            "warnings": ["grade_skipped_heuristic_confident"],
+            "candidates": candidates,
         }
 
     try:
@@ -212,6 +276,7 @@ def grade(state: AgentState) -> dict:
             "grade_score": 0.7,
             "grade_notes": f"grading failed: {exc}",
             "warnings": ["grade_failed"],
+            "candidates": candidates,
         }
 
     score = float(data.get("score", 0.0) or 0.0)
@@ -229,6 +294,7 @@ def grade(state: AgentState) -> dict:
         "grade_notes": str(data.get("notes", ""))[:400],
         "better_query": str(data.get("better_query", ""))[:200],
         "candidates": reordered,
+        "prompt_versions": {**state.get("prompt_versions", {}), "grade": prompts.GRADE_PROMPT_VERSION},
         **_account(result),
     }
 
@@ -275,6 +341,17 @@ def generate(state: AgentState) -> dict:
     if not candidates:
         return {"node_path": ["generate"], "error": "nothing to recommend"}
 
+    # Bandit-style exploration: occasionally force a genuinely under-shown candidate
+    # into consideration, regardless of what grade()/the heuristic ranker concluded.
+    # Applied here rather than as its own graph node — every upstream path (LLM-graded,
+    # heuristic-skipped, coldstart) already funnels through generate(), so this is the
+    # one place that reaches all of them without adding a 10th node.
+    with session_scope() as db:
+        exposure = impression_counts(db, [c["product_id"] for c in candidates])
+    candidates = ranking.apply_exploration_slot(
+        candidates, exposure, settings.explore_epsilon, state["top_k"]
+    )
+
     if not mesh.available:
         return {"node_path": ["generate"], **_deterministic_copy(state, candidates)}
 
@@ -316,6 +393,9 @@ def generate(state: AgentState) -> dict:
         "picks": picks,
         "model": result.model,
         "strategy": state.get("strategy", "agentic"),
+        "prompt_versions": {
+            **state.get("prompt_versions", {}), "generate": prompts.GENERATE_PROMPT_VERSION
+        },
         **_account(result),
     }
 
