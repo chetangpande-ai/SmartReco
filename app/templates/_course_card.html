@@ -1,0 +1,54 @@
+{% from "_media.html" import media %}
+
+{#
+  The marketplace course card: everything a learner compares on before clicking.
+
+  Distinct from `_card.html`'s `product_card`, which is the compact tile the home-page
+  shelves use. Two cards rather than one with six flags — the shelves need something
+  246px wide that reads at a glance, and this needs instructor, duration, skills and
+  certificate. Trying to be both produced a card that was wrong in both places.
+#}
+{% macro course_card(p, position=0, source='marketplace') -%}
+<article class="card course-card">
+  <a class="card-link" href="/products/{{ p.slug }}"
+     data-track-click="{{ 'search_result_click' if source == 'search' else 'product_click' }}"
+     data-product-slug="{{ p.slug }}" data-position="{{ position }}" data-source="{{ source }}">
+    {{ media(p) }}
+    <div class="card-body">
+      <div class="card-top">
+        <span class="pill pill-{{ p.tier }}">{{ p.tier }}</span>
+        {% if p.format != 'Self-Paced Course' %}<span class="pill pill-format">{{ p.format }}</span>{% endif %}
+      </div>
+      <h3 class="card-title">{{ p.title }}</h3>
+      <p class="card-by muted">{{ p.instructor or p.brand }}</p>
+
+      <div class="card-stats">
+        <span class="stars" title="{{ '%.1f'|format(p.rating) }} out of 5">
+          ★ {{ '%.1f'|format(p.rating) }}
+        </span>
+        <span class="muted">({{ '{:,}'.format(p.reviews) }})</span>
+        {% if p.learners %}<span class="muted">· {{ '{:,}'.format(p.learners) }} learners</span>{% endif %}
+      </div>
+
+      <div class="card-meta muted">
+        {% if p.duration_hours %}<span>{{ p.duration_hours }}h</span>{% endif %}
+        {% if p.projects %}<span>{{ p.projects|length }} project{{ 's' if p.projects|length != 1 }}</span>{% endif %}
+        {% if p.labs %}<span>{{ p.labs }} labs</span>{% endif %}
+        {% if p.certificate %}<span class="has-cert">Certificate</span>{% endif %}
+      </div>
+
+      {% if p.teaches %}
+      <div class="card-skills">
+        {% for slug in p.teaches[:3] %}<span class="mini-chip">{{ slug|skill }}</span>{% endfor %}
+        {% if p.teaches|length > 3 %}<span class="mini-chip mini-more">+{{ p.teaches|length - 3 }}</span>{% endif %}
+      </div>
+      {% endif %}
+
+      <div class="card-foot">
+        <span class="price">{{ p.price_cents|money }}</span>
+        <span class="muted small">{{ p.category|track }}</span>
+      </div>
+    </div>
+  </a>
+</article>
+{%- endmacro %}

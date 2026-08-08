@@ -29,12 +29,18 @@
     <nav class="nav">
       {% if user %}
         <div class="nav-links">
-          <a href="/" class="nav-link {{ 'active' if request.url.path == '/' }}">Courses</a>
-          <a href="/me" class="nav-link {{ 'active' if request.url.path.startswith('/me') }}">My picks</a>
+          <a href="/explore" class="nav-link {{ 'active' if request.url.path.startswith('/explore') or request.url.path == '/courses' }}">Explore</a>
+          <a href="/careers" class="nav-link {{ 'active' if request.url.path.startswith('/careers') }}">Careers</a>
+          <a href="/me" class="nav-link {{ 'active' if request.url.path.startswith('/me') }}">My learning</a>
           {% if user.is_admin %}
             <a href="/admin" class="nav-link {{ 'active' if request.url.path.startswith('/admin') }}">Operations</a>
           {% endif %}
         </div>
+        {# The differentiator, so it is a button rather than a fifth link competing with
+           the browse destinations either side of it. #}
+        <a href="/career" class="btn btn-ai btn-sm {{ 'is-on' if request.url.path == '/career' }}">
+          <span aria-hidden="true">✦</span> AI Advisor
+        </a>
         <div class="account">
           <span class="user-chip" title="{{ user.email }}{{ ' — administrator' if user.is_admin }}">
             <span class="avatar">
@@ -53,7 +59,13 @@
           </form>
         </div>
       {% else %}
-        <a href="/" class="nav-link {{ 'active' if request.url.path == '/' }}">Courses</a>
+        <div class="nav-links">
+          <a href="/explore" class="nav-link {{ 'active' if request.url.path.startswith('/explore') or request.url.path == '/courses' }}">Explore</a>
+          <a href="/careers" class="nav-link {{ 'active' if request.url.path.startswith('/careers') }}">Careers</a>
+          <a href="/career" class="nav-link nav-ai {{ 'active' if request.url.path == '/career' }}">
+            <span aria-hidden="true">✦</span> AI Advisor
+          </a>
+        </div>
         <a href="/login" class="nav-link">Sign in</a>
         <a href="/register" class="btn btn-primary">Get started</a>
       {% endif %}
@@ -61,13 +73,28 @@
   </div>
 </header>
 
+{# Only the learner-facing pages pass `categories`; on admin and auth screens the bar is
+   simply absent, which is correct — they are not places you browse from. #}
+{% if categories %}
+<nav class="browsebar" aria-label="Course tracks">
+  <div class="wrap browsebar-inner">
+    <a class="browse-link {{ 'active' if request.url.path == '/' and not active_category }}"
+       href="/" data-track-filter="category" data-value="">All courses</a>
+    {% for c in categories %}
+      <a class="browse-link {{ 'active' if active_category == c }}"
+         href="/?category={{ c }}" data-track-filter="category" data-value="{{ c }}">{{ c|track }}</a>
+    {% endfor %}
+  </div>
+</nav>
+{% endif %}
+
 <main class="wrap">
   {% block content %}{% endblock %}
 </main>
 
 <footer class="footer">
   <div class="wrap">
-    <span>SmartReco — behavioural recommendation agent</span>
+    <span>SmartReco — a career learning marketplace</span>
     <span class="muted">Activity on this site is tracked to personalise your recommendations.</span>
     <a href="/support" class="nav-link">Support · FAQ</a>
   </div>

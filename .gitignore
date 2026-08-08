@@ -14,8 +14,9 @@ venv/
 .coverage
 htmlcov/
 
-# Runtime data
-data/
+# Runtime data. Rooted: the chroma index and sqlite file live in ./data, but
+# app/data/ is seed data that ships with the package.
+/data/
 *.db
 *.sqlite3
 chroma/

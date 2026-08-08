@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% from "career/_roadmap.html" import roadmap, readiness_bar %}
+{% block title %}AI Career Advisor — SmartReco{% endblock %}
+
+{% block content %}
+<section class="career-hero">
+  <span class="eyebrow">AI Career Advisor</span>
+  <h1>Where do you want your career to go?</h1>
+  <p class="lede">
+    Tell us where you are today. We work out which of your skills already count, which
+    are genuinely missing, and the order to close them in — using the real catalogue,
+    not a generic curriculum.
+  </p>
+</section>
+
+<div class="advisor-grid">
+  <form class="advisor-form card-panel" method="post" action="/career/advisor" id="advisor">
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+
+    <h2>Your profile</h2>
+
+    <div class="form-row">
+      <label>Current role
+        <input type="text" name="current_role" maxlength="120" placeholder="QA Engineer"
+               value="{{ prefill.current_role if prefill else (profile.current_role if profile else '') }}">
+      </label>
+      <label>Years of experience
+        <input type="number" name="years_experience" min="0" max="60"
+               value="{{ prefill.years if prefill else (profile.years_experience if profile else 0) }}">
+      </label>
+    </div>
+
+    <label>Skills you already have
+      <input type="text" name="skills" maxlength="400" placeholder="Java, Selenium, API testing"
+             value="{{ prefill.skills if prefill else (profile_skills or '') }}">
+      <span class="field-hint">Comma separated. We match them against the skill graph, so
+        spelling does not have to be exact.</span>
+    </label>
+
+    <label>Technologies you know
+      <input type="text" name="technologies" maxlength="400" placeholder="Jenkins, Docker, Postman"
+             value="{{ prefill.technologies if prefill else '' }}">
+    </label>
+
+    <div class="form-row">
+      <label>Target role
+        <select name="target_role" required>
+          <option value="">Choose a role…</option>
+          {% for role in roles %}
+            <option value="{{ role.slug }}"
+              {{ 'selected' if (prefill.target if prefill else (profile.target_role if profile else '')) == role.slug }}>
+              {{ role.name }}
+            </option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Current level
+        <select name="level">
+          <option value="">Work it out from my experience</option>
+          {% for lvl in levels %}
+            <option value="{{ lvl }}" {{ 'selected' if profile and profile.level == lvl }}>{{ lvl }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+
+    <div class="form-row">
+      <label>Career interests
+        <input type="text" name="interests" maxlength="300" placeholder="agentic AI, evaluation"
+               value="{{ prefill.interests if prefill else (profile.interests if profile else '') }}">
+      </label>
+      <label>Hours per week
+        <input type="number" name="weekly_hours" min="0" max="80"
+               value="{{ prefill.hours if prefill else (profile.weekly_hours if profile else 6) }}">
+      </label>
+    </div>
+
+    {% if user %}
+      <button class="btn btn-primary btn-block btn-lg" type="submit">Build my career path with AI</button>
+    {% else %}
+      <a class="btn btn-primary btn-block btn-lg" href="/login?next=/career">Sign in to build your path</a>
+    {% endif %}
+
+    {% if not prefill and not profile %}
+    <p class="field-hint centered">
+      In a hurry? <a class="link" href="/career?demo=1#advisor">Load the QA&nbsp;→&nbsp;AI Engineer example</a>
+    </p>
+    {% endif %}
+  </form>
+
+  <aside class="advisor-side">
+    <div class="card-panel">
+      <h3>What you get</h3>
+      <ul class="tick-list">
+        <li>The skills you already have that count toward the role</li>
+        <li>Your real gaps, not a generic syllabus</li>
+        <li>A course for each gap, in an order that never assumes what you have not learned</li>
+        <li>Projects, assessment, certification and interview preparation</li>
+      </ul>
+    </div>
+    <div class="card-panel">
+      <h3>Popular moves</h3>
+      <ul class="link-list">
+        {% for p in featured_paths %}
+          <li><a href="/careers/{{ p.slug }}">{{ p.name }}</a></li>
+        {% endfor %}
+      </ul>
+    </div>
+  </aside>
+</div>
+
+{% if plan %}
+<section id="plan" class="plan">
+  <div class="section-divider"><h2>Your personalised path</h2></div>
+
+  <div class="plan-head card-panel">
+    <div>
+      <h3 class="plan-headline">{{ plan.headline }}</h3>
+      <p class="plan-narrative">{{ plan.narrative }}</p>
+      <p class="muted">
+        <span class="pill pill-cat">{{ plan.strategy }}</span>
+        {% if plan.model %}<span class="pill pill-plain">{{ plan.model }}</span>{% endif %}
+        {% if plan.path_slug %}
+          <a class="pill pill-plain" href="/careers/{{ plan.path_slug }}">full roadmap for this path</a>
+        {% endif %}
+        <span class="pill pill-plain">{{ plan.created_at.strftime('%d %b, %H:%M') }}</span>
+      </p>
+    </div>
+    <div class="plan-score">
+      <div class="dial" style="--pct: {{ (plan.readiness * 100)|round }}">
+        <span>{{ '%.0f'|format(plan.readiness * 100) }}<small>%</small></span>
+      </div>
+      <span class="muted">ready for {{ target_name }}</span>
+    </div>
+  </div>
+
+  {{ roadmap(plan.stages) }}
+</section>
+{% endif %}
+{% endblock %}

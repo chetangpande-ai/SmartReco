@@ -55,6 +55,13 @@ from app.security import hash_password  # noqa: E402
 
 # Small fixed catalogue: big enough for retrieval to be meaningful, small enough that
 # the whole suite stays fast. Two providers appear twice so provider affinity is testable.
+#
+# `SKILLS` maps a title to (teaches, requires) in canonical `app.taxonomy` slugs. Kept
+# beside the catalogue rather than as more tuple positions because only the career tests
+# care, and threading two more fields through every row would make the rest unreadable.
+# The chain it encodes is deliberate: python -> llms -> rag -> ai-agents, each requiring
+# the one before, which is what lets a test assert the advisor sequences rather than
+# merely lists.
 CATALOG = [
     ("Deep Learning Specialization", "DeepLearning.AI", "ai-ml", "advanced", 5900,
      ["deep-learning", "neural-networks", "tensorflow", "cnn"],
@@ -98,6 +105,19 @@ CATALOG = [
      "Networking and Linux fundamentals first, then reconnaissance and exploitation in a lab you build yourself."),
 ]
 
+SKILLS = {
+    "Deep Learning Specialization": (("deep-learning", "neural-networks"), ("python",)),
+    "Natural Language Processing with Transformers": (("nlp", "transformers"), ("deep-learning",)),
+    "Machine Learning Specialization": (("machine-learning", "statistics"), ("python",)),
+    "Practical Deep Learning for Coders": (("python", "llms", "rag", "ai-agents"), ()),
+    "Total TypeScript": (("typescript",), ("javascript",)),
+    "Complete Intro to React": (("react", "javascript"), ()),
+    "Data Engineering Zoomcamp": (("etl", "airflow", "spark"), ("python", "sql")),
+    "SQL for Data Analysis": (("sql", "databases"), ()),
+    "Offensive Security Certified Professional": (("penetration-testing",), ("linux",)),
+    "Practical Ethical Hacking": (("linux", "networking", "security"), ()),
+}
+
 # Names the tests refer to, kept as constants so a catalogue edit is a one-line change.
 ADVANCED_AI = "Deep Learning Specialization"
 SECOND_AI = "Natural Language Processing with Transformers"
@@ -131,11 +151,14 @@ def catalog(_database):
 
     with session_scope() as db:
         for title, brand, category, tier, price, tags, spec, description in CATALOG:
+            teaches, requires = SKILLS.get(title, ((), ()))
             create_product(
                 db,
                 ProductIn(
                     title=title, description=description, category=category, tier=tier,
                     tags=tags, price_cents=price, rating=4.5, brand=brand, spec=spec,
+                    teaches=list(teaches), requires=list(requires),
+                    duration_hours=20, certificate=True, instructor=brand,
                 ),
             )
     outbox.drain_all()

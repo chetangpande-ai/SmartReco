@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Career paths — SmartReco{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <span class="eyebrow">Career paths</span>
+  <h1>From where you are to where you want to be.</h1>
+  <p class="lede">
+    Each path is a sequence, not a shopping list: skills in the order they build on each
+    other, then the projects, certification and interview preparation that make it
+    legible to someone hiring.
+  </p>
+  {% if not profile %}
+    <a class="btn btn-primary" href="/career">Build my career path with AI</a>
+  {% endif %}
+</section>
+
+{% if profile %}
+<p class="muted callout">
+  Ordered by how close you already are, based on the profile you gave the
+  <a class="link" href="/career">AI Career Advisor</a>.
+</p>
+{% endif %}
+
+<div class="path-grid">
+  {% for c in cards %}
+    <a class="path-card" href="/careers/{{ c.path.slug }}"
+       data-track-click="filter" data-source="careers">
+      {% if c.from_role %}
+        <div class="path-transition">
+          <span class="path-from">{{ c.from_role.name }}</span>
+          <span class="path-arrow" aria-hidden="true">→</span>
+          <span class="path-to">{{ c.to_role.name if c.to_role else c.path.name }}</span>
+        </div>
+      {% else %}
+        {% set target = c.to_role.name if c.to_role else c.path.name %}
+        <div class="path-transition">
+          <span class="path-to">Become {{ target|article }} {{ target }}</span>
+        </div>
+      {% endif %}
+
+      <div class="path-steps">
+        {% for step in c.path.steps if step.kind == 'skill' %}
+          {% if loop.index <= 5 %}<span class="path-step">{{ step.label }}</span>{% endif %}
+        {% endfor %}
+        {% if c.steps > 5 %}<span class="path-step path-more">+{{ c.steps - 5 }}</span>{% endif %}
+      </div>
+
+      <div class="path-foot">
+        {% if profile %}
+          <span class="readiness-track readiness-mini">
+            <span class="readiness-fill" style="width: {{ (c.readiness * 100)|round }}%"></span>
+          </span>
+          <span class="muted">{{ c.have }}/{{ c.required }} skills</span>
+        {% else %}
+          <span class="muted">{{ c.steps }} skills · {{ c.required }} required for the role</span>
+        {% endif %}
+      </div>
+    </a>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_card.html" import product_card %}
+{% from "_course_card.html" import course_card %}
 {% from "_media.html" import media %}
 {% block title %}{{ product.title }} — SmartReco{% endblock %}
 
@@ -15,41 +15,216 @@
     <div class="card-top">
       <span class="pill pill-{{ product.tier }}">{{ product.tier }}</span>
       <span class="pill pill-cat">{{ product.category|track }}</span>
-      {% if product.brand %}<span class="pill pill-plain">{{ product.brand }}</span>{% endif %}
+      <span class="pill pill-format">{{ product.format }}</span>
+      {% if product.certificate %}<span class="pill pill-cert">Certificate</span>{% endif %}
     </div>
     <h1>{{ product.title }}</h1>
     {% if product.spec %}<p class="detail-spec">{{ product.spec }}</p>{% endif %}
+
+    <div class="detail-stats">
+      <span class="stars">★ {{ '%.1f'|format(product.rating) }}</span>
+      <span class="muted">{{ '{:,}'.format(product.reviews) }} reviews</span>
+      {% if product.learners %}<span class="muted">· {{ '{:,}'.format(product.learners) }} learners</span>{% endif %}
+      <span class="muted">· by {{ product.instructor or product.brand }}</span>
+    </div>
+
     <p class="lede">{{ product.description }}</p>
 
-    {% if product.tags %}
-    <div class="tags">
-      {% for t in product.tags %}<span class="tag">{{ t.replace('-', ' ') }}</span>{% endfor %}
-    </div>
+    {% if product.objectives %}
+    <section class="detail-block">
+      <h2>What you'll learn</h2>
+      <ul class="tick-list two-col">
+        {% for line in product.objectives %}<li>{{ line }}</li>{% endfor %}
+      </ul>
+    </section>
+    {% endif %}
+
+    {% if product.teaches %}
+    <section class="detail-block">
+      <h2>Skills covered</h2>
+      <div class="topics topics-tight">
+        {% for slug in product.teaches %}
+          <a class="topic" href="/explore/skills/{{ slug }}">{{ slug|skill }}</a>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    {% if prerequisites %}
+    <section class="detail-block">
+      <h2>Prerequisites</h2>
+      <p class="muted">This course assumes you already have:</p>
+      <div class="topics topics-tight">
+        {% for pre in prerequisites %}
+          <a class="mini-chip" href="/explore/skills/{{ pre.slug }}">{{ pre.name }}</a>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    {% if product.curriculum %}
+    <section class="detail-block">
+      <h2>Curriculum</h2>
+      <ol class="curriculum">
+        {% for module in product.curriculum %}
+          <li><span class="curriculum-n">{{ loop.index }}</span>{{ module }}</li>
+        {% endfor %}
+      </ol>
+    </section>
+    {% endif %}
+
+    {% if product.labs or product.assessments or product.projects %}
+    <section class="detail-block">
+      <h2>Hands-on work</h2>
+      <div class="practice-row">
+        {% if product.labs %}
+        <div class="practice"><strong>{{ product.labs }}</strong><span class="muted">interactive labs</span></div>
+        {% endif %}
+        {% if product.assessments %}
+        <div class="practice"><strong>{{ product.assessments }}</strong><span class="muted">assessments</span></div>
+        {% endif %}
+        {% if product.projects %}
+        <div class="practice">
+          <strong>{{ product.projects|length }}</strong>
+          <span class="muted">project{{ 's' if product.projects|length != 1 }}</span>
+        </div>
+        {% endif %}
+      </div>
+      {% if product.projects %}
+      <ul class="tick-list">
+        {% for proj in product.projects %}<li>{{ proj }}</li>{% endfor %}
+      </ul>
+      {% endif %}
+    </section>
+    {% endif %}
+
+    <section class="detail-block">
+      <h2>Instructor</h2>
+      <div class="instructor">
+        <span class="greeting-avatar avatar-sm" aria-hidden="true">
+          {{ (product.instructor or product.brand or '?')[0]|upper }}
+        </span>
+        <div>
+          <strong>{{ product.instructor or product.brand }}</strong>
+          <p class="muted">{{ product.brand }}{% if product.instructor and product.instructor != product.brand %} · {{ product.instructor }}{% endif %}</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="detail-block">
+      <h2>Reviews</h2>
+      <div class="review-summary">
+        <span class="review-score">{{ '%.1f'|format(product.rating) }}</span>
+        <div>
+          <span class="stars">{{ '★' * (product.rating|round|int) }}{{ '☆' * (5 - product.rating|round|int) }}</span>
+          <p class="muted">
+            From {{ '{:,}'.format(product.reviews) }} learner reviews
+            {% if product.learners %}across {{ '{:,}'.format(product.learners) }} enrolments{% endif %}.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    {% if paths %}
+    <section class="detail-block">
+      <h2>Career paths this belongs to</h2>
+      <div class="topics topics-tight">
+        {% for p in paths %}<a class="topic" href="/careers/{{ p.slug }}">{{ p.name }}</a>{% endfor %}
+      </div>
+    </section>
     {% endif %}
   </div>
 
   <aside class="detail-side">
     <div class="price-big">{{ product.price_cents|money }}</div>
     <dl class="meta">
-      <dt>Brand</dt><dd>{{ product.brand or '—' }}</dd>
       <dt>Level</dt><dd>{{ product.tier }}</dd>
-      <dt>Rating</dt><dd>★ {{ '%.1f'|format(product.rating) }}</dd>
-      <dt>Access</dt><dd>Self-paced</dd>
+      <dt>Duration</dt><dd>{{ product.duration_hours }}h</dd>
+      <dt>Format</dt><dd>{{ product.format }}</dd>
+      <dt>Delivery</dt><dd>{{ product.delivery_mode }}</dd>
+      <dt>Language</dt><dd>{{ product.language }}</dd>
+      <dt>Certificate</dt><dd>{{ 'Yes' if product.certificate else 'No' }}</dd>
     </dl>
-    <button class="btn btn-primary btn-block"
-            data-track-click="enroll" data-product-slug="{{ product.slug }}"
-            data-toast="You're enrolled — happy studying">Enrol now</button>
-    <button class="btn btn-ghost btn-block"
-            data-track-click="wishlist" data-product-slug="{{ product.slug }}"
-            data-toast="Saved to your list">Save for later</button>
+
+    {% if enrollment and enrollment.status == 'completed' %}
+      <div class="enrolled-badge">
+        Completed
+        {% if enrollment.certificate_code %}<span class="mono small">{{ enrollment.certificate_code }}</span>{% endif %}
+      </div>
+      <a class="btn btn-ghost btn-block" href="/me">Go to My learning</a>
+    {% else %}
+      <form method="post" action="/products/{{ product.slug }}/enroll">
+        <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+        <input type="hidden" name="action" value="start">
+        <button class="btn btn-primary btn-block btn-lg" type="submit"
+                data-track-click="enroll" data-product-slug="{{ product.slug }}"
+                data-toast="{{ 'Resuming — good luck' if enrollment else 'Started. Happy studying' }}">
+          {{ 'Continue learning' if enrollment and enrollment.status == 'active' else 'Start learning' }}
+        </button>
+      </form>
+      <form method="post" action="/products/{{ product.slug }}/enroll">
+        <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+        <input type="hidden" name="action" value="save">
+        <button class="btn btn-ghost btn-block" type="submit"
+                data-track-click="wishlist" data-product-slug="{{ product.slug }}"
+                data-toast="Saved to your list">Save for later</button>
+      </form>
+    {% endif %}
+
+    {% if enrollment and enrollment.status == 'active' %}
+    <div class="side-progress">
+      <div class="readiness-track"><span class="readiness-fill" style="width: {{ enrollment.progress_pct }}%"></span></div>
+      <span class="muted small">{{ enrollment.progress_pct }}% complete</span>
+    </div>
+    {% endif %}
+
+    <form class="ai-cta" method="post" action="/products/{{ product.slug }}/fit">
+      <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+      <button class="btn btn-ai btn-block" type="submit">
+        <span aria-hidden="true">✦</span> Ask AI if this course is right for me
+      </button>
+    </form>
+
+    {% if fit %}
+    <div class="fit-answer fit-{{ fit.verdict|replace(' ', '-') }}" id="fit">
+      <span class="fit-verdict">{{ fit.verdict }}</span>
+      <p>{{ fit.answer }}</p>
+      {% if fit.missing %}
+      <p class="muted small">
+        Close first:
+        {% for slug in fit.missing %}
+          <a class="link" href="/courses?skill={{ slug }}">{{ slug|skill }}</a>{{ ', ' if not loop.last }}
+        {% endfor %}
+      </p>
+      {% endif %}
+      {% if not user %}
+        <p class="muted small"><a class="link" href="/career">Tell the advisor about yourself</a> for a real answer.</p>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if roles %}
+    <div class="side-block">
+      <h3>Roles that want this</h3>
+      <div class="topics topics-tight">
+        {% for r in roles %}<a class="mini-chip" href="/courses?role={{ r.slug }}">{{ r.name }}</a>{% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if product.tags %}
+    <div class="tags">
+      {% for t in product.tags %}<span class="tag">{{ t.replace('-', ' ') }}</span>{% endfor %}
+    </div>
+    {% endif %}
   </aside>
 </article>
 
 {% if related %}
 <section>
-  <h2 class="section-title">More in {{ product.category|track }}</h2>
-  <div class="grid">
-    {% for p in related %}{{ product_card(p, loop.index0, 'related') }}{% endfor %}
+  <h2 class="section-title">Related courses</h2>
+  <div class="grid grid-courses">
+    {% for p in related %}{{ course_card(p, loop.index0, 'related') }}{% endfor %}
   </div>
 </section>
 {% endif %}

@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% from "_course_card.html" import course_card %}
+{% block title %}Courses — SmartReco{% endblock %}
+{% block body_attrs %}{% if filters.q %}data-search-query="{{ filters.q }}" data-search-results="{{ total }}"{% endif %}{% endblock %}
+
+{#
+  Filters are links, not a form. Every combination is then a real URL: shareable,
+  bookmarkable, back-button-correct, and working with JavaScript off. `filters.query()`
+  rebuilds the query string with one facet changed; setting a facet to "" removes it,
+  which is what makes each chip a toggle.
+#}
+{% macro facet(filters, label, field, value) -%}
+{%- set on = filters.is_on(field, value) -%}
+<a class="chip {{ 'chip-on' if on }}"
+   href="/courses?{{ filters.query(**{field: '' if on else value}) }}"
+   data-track-filter="{{ field }}" data-value="{{ value }}">{{ label }}</a>
+{%- endmacro %}
+
+{% block content %}
+<section class="market-head">
+  <div>
+    <h1>{% if filters.q %}Results for “{{ filters.q }}”{% else %}Explore courses{% endif %}</h1>
+    <p class="muted">{{ '{:,}'.format(total) }} course{{ 's' if total != 1 }} match</p>
+  </div>
+  <div class="sort-control">
+    <span class="muted small">Sort</span>
+    <span class="sort-links">
+      {% for key, label in [('popular','Most learners'), ('rating','Highest rated'), ('shortest','Shortest'), ('price-low','Price')] %}
+        <a class="chip {{ 'chip-on' if filters.sort == key }}" href="/courses?{{ filters.query(sort=key) }}">{{ label }}</a>
+      {% endfor %}
+    </span>
+  </div>
+</section>
+
+<div class="market">
+  <aside class="facets">
+    <div class="facet-group">
+      <h3>Category</h3>
+      <div class="facet-list">
+        {% for c in tax.categories %}{{ facet(filters, c.name, 'category', c.slug) }}{% endfor %}
+      </div>
+    </div>
+
+    {% if filters.category %}
+    <div class="facet-group">
+      <h3>Topic area</h3>
+      <div class="facet-list">
+        {% for s in tax.category_by_slug[filters.category].subcategories %}
+          {{ facet(filters, s.name, 'sub', s.key) }}
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="facet-group">
+      <h3>Career role</h3>
+      <div class="facet-list facet-scroll">
+        {% for r in roles %}{{ facet(filters, r.name, 'role', r.slug) }}{% endfor %}
+      </div>
+    </div>
+
+    <div class="facet-group">
+      <h3>Difficulty</h3>
+      <div class="facet-list">
+        {% for lvl in ['beginner', 'intermediate', 'advanced'] %}{{ facet(filters, lvl, 'level', lvl) }}{% endfor %}
+      </div>
+    </div>
+
+    <div class="facet-group">
+      <h3>Format</h3>
+      <div class="facet-list facet-scroll">
+        {% for f in tax.program_types %}{{ facet(filters, f, 'format', f) }}{% endfor %}
+      </div>
+    </div>
+
+    <div class="facet-group">
+      <h3>Duration</h3>
+      <div class="facet-list">
+        {% for d in duration_buckets %}{{ facet(filters, d, 'duration', d) }}{% endfor %}
+      </div>
+    </div>
+
+    <div class="facet-group">
+      <h3>Price</h3>
+      <div class="facet-list">
+        {{ facet(filters, 'Free', 'price', 'free') }}
+        {{ facet(filters, 'Paid', 'price', 'paid') }}
+      </div>
+    </div>
+
+    <div class="facet-group">
+      <h3>Rating</h3>
+      <div class="facet-list">
+        {{ facet(filters, '4.0 and up', 'rating', '4.0') }}
+        {{ facet(filters, '4.5 and up', 'rating', '4.5') }}
+      </div>
+    </div>
+
+    <div class="facet-group">
+      <h3>Certificate</h3>
+      <div class="facet-list">
+        {{ facet(filters, 'Certificate available', 'certificate', '1') }}
+      </div>
+    </div>
+  </aside>
+
+  <div class="market-results">
+    {% if filters.active %}
+    <div class="active-filters">
+      <span class="muted small">Filtering by</span>
+      {% for field, value in filters.active %}
+        <a class="chip chip-on chip-remove" href="/courses?{{ filters.query(**{field: ''}) }}">
+          {{ value }} <span aria-hidden="true">×</span>
+        </a>
+      {% endfor %}
+      <a class="link small" href="/courses">Clear all</a>
+    </div>
+    {% endif %}
+
+    <div class="grid grid-courses">
+      {% for p in courses %}
+        {{ course_card(p, loop.index0, 'search' if filters.q else 'marketplace') }}
+      {% else %}
+        <p class="empty">Nothing matches all of those filters. Try removing one.</p>
+      {% endfor %}
+    </div>
+
+    {% if pages > 1 %}
+    <nav class="pager">
+      {% if page > 1 %}
+        <a class="btn btn-ghost btn-sm" href="/courses?{{ filters.query() }}&page={{ page - 1 }}">← Previous</a>
+      {% endif %}
+      <span class="muted small">Page {{ page }} of {{ pages }}</span>
+      {% if page < pages %}
+        <a class="btn btn-ghost btn-sm" href="/courses?{{ filters.query() }}&page={{ page + 1 }}">Next →</a>
+      {% endif %}
+    </nav>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

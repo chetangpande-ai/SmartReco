@@ -14,7 +14,7 @@ from app.db import SessionLocal, init_db
 from app.deps import ANON_COOKIE, new_anon_id
 from app.logging_conf import configure_logging, new_request_id, request_id_var
 from app.models import User
-from app.routers import admin, auth, events, health, pages, recommendations
+from app.routers import admin, auth, career, events, explore, health, pages, recommendations
 from app.security import (
     CSRF_COOKIE,
     SESSION_COOKIE,
@@ -75,7 +75,11 @@ app.include_router(health.router)
 app.include_router(events.router)
 app.include_router(auth.router)
 app.include_router(recommendations.router)
+app.include_router(career.router)
+app.include_router(explore.router)
 app.include_router(admin.router)
+# Last: its /products/{slug} would otherwise shadow nothing, but keeping the catch-all
+# page router at the end is what stops a future static route being unreachable.
 app.include_router(pages.router)
 
 

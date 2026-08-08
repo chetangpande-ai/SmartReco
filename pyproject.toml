@@ -6,8 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11,<3.14"
 
 # Constraints are minimums; uv.lock pins the exact resolved versions and is
-# committed. Hard `==` pins across a stack this wide deadlock against each other
-# (deepagents -> langchain-google-genai -> google-genai needs anyio>=4.8, for one).
+# committed. Hard `==` pins across a stack this wide deadlock against each other.
 dependencies = [
     # Web
     "fastapi>=0.141",
@@ -24,14 +23,15 @@ dependencies = [
     # Auth
     "bcrypt>=4.2",
     "pyjwt>=2.10",
-    # LLM + agent. Every model call is routed at the Mesh gateway.
+    # LLM + agent. Deliberately short: the only model client in the project is the
+    # OpenAI SDK, pointed at the Mesh gateway by `services/mesh.py`. langchain,
+    # langchain-openai and deepagents were declared here once and imported nowhere —
+    # deepagents alone pulled in a Google GenAI client, which is a second model SDK
+    # sitting in the dependency tree of a project whose one rule is that every call
+    # leaves through Mesh. langchain-core arrives as a langgraph dependency.
     "openai>=2.52",
-    "langchain>=1.3",
-    "langchain-core>=1.5",
-    "langchain-openai>=1.4",
     "langgraph>=1.2",
     "langsmith>=0.10",
-    "deepagents>=0.7",
     # Vector stores — two real backends, selected by VECTOR_BACKEND
     "chromadb>=1.5",
     "pinecone>=9.1",
@@ -69,7 +69,9 @@ package = false
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-exclude = [".venv", "data", "alembic"]
+# "/data" is rooted: the runtime chroma/sqlite directory is excluded, app/data/ is
+# seed data that ships with the package and is ordinary Python worth linting.
+exclude = [".venv", "/data", "alembic"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "C4", "SIM"]

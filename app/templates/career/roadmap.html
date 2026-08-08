@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% from "career/_roadmap.html" import roadmap, readiness_bar %}
+{% block title %}{{ path.name }} — SmartReco{% endblock %}
+
+{% block content %}
+<section class="roadmap-head">
+  <a class="back-link" href="/careers">← All career paths</a>
+  <span class="eyebrow">Career path</span>
+  <h1>
+    {% if from_role %}
+      {{ from_role.name }} <span class="path-arrow" aria-hidden="true">→</span> {{ analysis.title }}
+    {% else %}
+      Become {{ analysis.title|article }} {{ analysis.title }}
+    {% endif %}
+  </h1>
+
+  {% if personalised %}
+    <p class="lede">
+      Built from what you told the advisor. Steps you have already covered are marked as
+      yours; everything else is still open.
+    </p>
+    {{ readiness_bar(analysis) }}
+  {% else %}
+    <p class="lede">
+      The full route, with every step still open. Tell us what you already know and it
+      collapses to just the gap.
+    </p>
+    <a class="btn btn-primary" href="/career">Personalise this with AI</a>
+  {% endif %}
+</section>
+
+{% if to_role %}
+<section class="role-skills card-panel">
+  <h2>What {{ to_role.name }} asks for</h2>
+  <div class="topics">
+    {% for slug in analysis.required %}
+      <a class="topic {{ 'topic-have' if slug in analysis.have }}" href="/explore/skills/{{ slug }}">
+        {{ slug|skill }}{% if slug in analysis.have %} ✓{% endif %}
+      </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{{ roadmap(analysis.stages) }}
+
+{% if not personalised %}
+<section class="empty-state">
+  <h2>This is the generic route</h2>
+  <p class="muted">
+    Tell the advisor what you already do for a living and the same roadmap shortens to
+    the part you actually need — usually by a third or more.
+  </p>
+  <a class="btn btn-primary" href="/career">Build my career path with AI</a>
+</section>
+{% endif %}
+{% endblock %}

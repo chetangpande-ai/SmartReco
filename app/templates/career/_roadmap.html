@@ -1,0 +1,90 @@
+{#
+  The career roadmap: eight stages from where someone is to the role they want.
+
+  Drawn as a spine rather than a list because the whole message is *sequence* — each
+  course only assumes what the one before it taught, and a bulleted list throws that
+  away. The stage set and its order come from `taxonomy.ROADMAP_STAGES`; nothing about
+  the shape of a career is decided in here.
+
+  Note `stage['entries']`, not `stage.entries` — see services/advisor._stages.
+#}
+
+{% macro stage_icon(key) -%}
+{%- if key == 'current' -%}<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/>
+{%- elif key == 'skills' -%}<path d="M12 3l2.4 6H21l-5 4 2 6.5-6-4-6 4 2-6.5-5-4h6.6z"/>
+{%- elif key == 'courses' -%}<path d="M4 5.5h6a2.5 2.5 0 012.5 2.5v11a2 2 0 00-2-2H4z"/><path d="M20 5.5h-6a2.5 2.5 0 00-2.5 2.5v11a2 2 0 012-2H20z"/>
+{%- elif key == 'projects' -%}<path d="M14.7 6.3a4 4 0 015.3 5.2l-8.4 8.4-4-4 8.4-8.4z"/><path d="M4 20l3.6-1.1"/>
+{%- elif key == 'assessment' -%}<path d="M9 11.5l2.2 2.2L15.5 9"/><rect x="4" y="4" width="16" height="16" rx="3"/>
+{%- elif key == 'certification' -%}<circle cx="12" cy="9.5" r="5.5"/><path d="M8.5 14.2L7 21l5-2.4L17 21l-1.5-6.8"/>
+{%- elif key == 'interview' -%}<path d="M4 5.5h16v10H12l-5 3.5v-3.5H4z"/>
+{%- else -%}<path d="M12 3l7.5 3.5v5.8c0 4.4-3.1 8.2-7.5 9.2-4.4-1-7.5-4.8-7.5-9.2V6.5z"/><path d="M9.2 12.2l2 2 3.6-3.9"/>
+{%- endif -%}
+{%- endmacro %}
+
+{% macro roadmap(stages) -%}
+<ol class="roadmap">
+  {% for stage in stages %}
+    {% set entries = stage['entries'] %}
+    <li class="road-stage road-{{ stage.key }} {{ 'is-empty' if not entries }}">
+      <span class="road-marker" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+             stroke-linecap="round" stroke-linejoin="round">{{ stage_icon(stage.key) }}</svg>
+      </span>
+      <div class="road-body">
+        <div class="road-head">
+          <h3 class="road-title">{{ stage.title }}</h3>
+          <span class="road-count">{{ entries|length }}</span>
+        </div>
+        <p class="road-sub muted">{{ stage.subtitle }}</p>
+
+        {% if entries %}
+        <div class="road-entries road-entries-{{ stage.key }}">
+          {% for e in entries %}
+            {% if e.kind == 'skill' %}
+              <a class="skill-chip {{ 'skill-have' if stage.key == 'current' }}" href="{{ e.href }}">
+                {{ e.label }}<span class="skill-note">{{ e.detail }}</span>
+              </a>
+            {% elif e.kind == 'note' %}
+              <span class="skill-chip skill-unknown" title="{{ e.detail }}">{{ e.label }}</span>
+            {% elif e.kind == 'role' %}
+              <div class="road-goal">
+                <strong>{{ e.label }}</strong>
+                <span class="muted">{{ e.detail }}</span>
+              </div>
+            {% else %}
+              <a class="road-card" href="{{ e.href }}"
+                 data-track-click="product_click" data-source="roadmap-{{ stage.key }}">
+                {% if e.step %}<span class="road-step">{{ e.step }}</span>{% endif %}
+                <span class="road-card-body">
+                  <strong>{{ e.label }}</strong>
+                  <span class="muted">{{ e.detail }}</span>
+                </span>
+              </a>
+            {% endif %}
+          {% endfor %}
+        </div>
+        {% else %}
+          <p class="road-empty muted">Nothing in the catalogue for this stage yet.</p>
+        {% endif %}
+      </div>
+    </li>
+  {% endfor %}
+</ol>
+{%- endmacro %}
+
+
+{# The one-line summary above a roadmap: readiness, gap count, hours of study. #}
+{% macro readiness_bar(analysis) -%}
+<div class="readiness">
+  <div class="readiness-head">
+    <span class="readiness-value">{{ '%.0f'|format(analysis.readiness * 100) }}%</span>
+    <span class="muted">
+      {{ analysis.have|length }} of {{ analysis.required|length }} skills
+      {{ analysis.title }} asks for
+    </span>
+  </div>
+  <div class="readiness-track">
+    <span class="readiness-fill" style="width: {{ (analysis.readiness * 100)|round }}%"></span>
+  </div>
+</div>
+{%- endmacro %}

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Explore learning — SmartReco{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <span class="eyebrow">Explore learning</span>
+  <h1>Everything there is to learn here, and what it adds up to.</h1>
+  <p class="lede">
+    Twenty-one categories, their topic areas and the individual skills underneath. Every
+    skill links to the courses that teach it and the roles that need it — so browsing
+    ends somewhere useful rather than in a list.
+  </p>
+</section>
+
+<div class="program-shelves">
+  {% for label, formats, count in shelves %}
+    <a class="program-tile" href="/courses?format={{ formats[0]|urlencode }}">
+      <strong>{{ label }}</strong>
+      <span class="muted">{{ count }} course{{ 's' if count != 1 }}</span>
+    </a>
+  {% endfor %}
+</div>
+
+<div class="section-divider"><h2>Browse by category</h2></div>
+
+{#
+  Categories and their topic areas only. Individual skills live on the category page,
+  one click away: rendering every topic in the taxonomy here produced eight hundred
+  links on one screen, which is not a browse experience — it is a sitemap.
+#}
+<div class="cat-grid">
+  {% for cat in tree %}
+  <a class="cat-card" href="/explore/categories/{{ cat.slug }}" style="--h: {{ cat.slug|hue }}">
+    <span class="cat-head">
+      <span class="tree-swatch" aria-hidden="true"></span>
+      <strong>{{ cat.name }}</strong>
+    </span>
+    <span class="cat-subs muted">
+      {{ cat.subcategories | map(attribute='name') | join(' · ') }}
+    </span>
+    <span class="cat-count muted small">
+      {{ counts.get(cat.slug, 0) }} course{{ 's' if counts.get(cat.slug, 0) != 1 }} ·
+      {{ cat.topics|length }} skills
+    </span>
+  </a>
+  {% endfor %}
+</div>
+
+<div class="section-divider"><h2>Browse by career role</h2></div>
+<div class="topics">
+  {% for r in roles %}<a class="topic" href="/courses?role={{ r.slug }}">{{ r.name }}</a>{% endfor %}
+</div>
+{% endblock %}

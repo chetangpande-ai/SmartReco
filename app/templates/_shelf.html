@@ -1,0 +1,37 @@
+{% from "_card.html" import product_card %}
+
+{#
+  One horizontal row of courses.
+
+  The track is a plain overflow-x scroller, so it works with a swipe, a trackpad or the
+  keyboard whether or not shelf.js loads; the buttons only add what a mouse user expects.
+  Cards here deliberately carry no `data-track-impression`: that fires `rec_impression`,
+  which is the exposure signal behind ranking.apply_exploration_slot. Counting a card
+  that scrolled past in a browse row as a recommendation impression would tell the
+  explorer a course has been shown far more than the agent ever showed it.
+#}
+{% macro shelf(s) -%}
+<section class="shelf" id="shelf-{{ s.key }}" data-shelf>
+  <div class="shelf-head">
+    <div>
+      <h2 class="shelf-title">{{ s.title }}</h2>
+      {% if s.subtitle %}<p class="shelf-sub muted">{{ s.subtitle }}</p>{% endif %}
+    </div>
+    {% if s.link %}<a class="shelf-link" href="{{ s.link }}">{{ s.link_label }} →</a>{% endif %}
+  </div>
+
+  <div class="shelf-viewport">
+    <button type="button" class="shelf-nav shelf-prev" aria-label="Scroll {{ s.title }} left">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+    </button>
+    <div class="shelf-track" data-shelf-track>
+      {% for p in s.products %}{{ product_card(p, loop.index0, s.key) }}{% endfor %}
+    </div>
+    <button type="button" class="shelf-nav shelf-next" aria-label="Scroll {{ s.title }} right">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
+    </button>
+  </div>
+</section>
+{%- endmacro %}

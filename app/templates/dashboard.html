@@ -1,28 +1,88 @@
 {% extends "base.html" %}
 {% from "_media.html" import media %}
-{% block title %}Your picks — SmartReco{% endblock %}
+{% from "_shelf.html" import shelf %}
+{% block title %}Your learning — SmartReco{% endblock %}
 {% block body_attrs %}data-poll-recs="{{ 1 if pending else 0 }}"{% endblock %}
 
+{#
+  One personal page. Sections render only when they have something in them — nine
+  headings over an empty account was the single most confusing thing on the old split
+  dashboard, and a heading is a promise that there is something underneath it.
+#}
+{% macro course_line(row, editable=false) -%}
+<article class="learn-row">
+  <a class="learn-title" href="/products/{{ row.product.slug }}"
+     data-track-click="product_click" data-product-slug="{{ row.product.slug }}"
+     data-source="my-learning">{{ row.product.title }}</a>
+  <span class="muted small">{{ row.product.instructor or row.product.brand }} · {{ row.product.duration_hours }}h</span>
+  {% if editable %}
+  <div class="learn-progress">
+    <span class="readiness-track"><span class="readiness-fill" style="width: {{ row.progress_pct }}%"></span></span>
+    <span class="muted small num">{{ row.progress_pct }}%</span>
+  </div>
+  {# Set by hand because there is no video player to infer it from. Honest about being
+     a demo control rather than faking a watched-minutes number. #}
+  <form class="learn-controls" method="post" action="/products/{{ row.product.slug }}/enroll">
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    <input type="hidden" name="action" value="progress">
+    <input class="progress-input" type="number" name="progress" min="0" max="100"
+           step="10" value="{{ row.progress_pct }}" aria-label="Progress percentage">
+    <button class="btn btn-ghost btn-sm" type="submit">Update</button>
+  </form>
+  {% endif %}
+</article>
+{%- endmacro %}
+
 {% block content %}
-<section class="rec-head">
-  <div>
-    <h1>Picked for you, {{ user.name or user.email }}</h1>
-    <p class="muted">
-      {% if rec %}
-        Refreshed {{ rec.created_at.strftime('%d %b, %H:%M') }} ·
-        <span class="pill pill-cat">{{ rec.strategy }}</span>
-        {% if rec.model %}<span class="pill pill-plain">{{ rec.model }}</span>{% endif %}
-        <span class="pill pill-plain">confidence {{ '%.0f'|format(rec.confidence * 100) }}%</span>
+<section class="greeting">
+  <span class="greeting-avatar" aria-hidden="true">{{ (user.name or user.email)[0]|upper }}</span>
+  <div class="greeting-text">
+    <h1>Welcome back, {{ user.name or user.email }}</h1>
+    <p class="greeting-sub muted">
+      {% if board.in_progress or board.completed %}
+        {{ board.in_progress|length }} in progress ·
+        {{ board.completed|length }} completed ·
+        {{ board.hours_done }}h studied
       {% else %}
-        Browse a few courses and your recommendations will build themselves.
+        This page builds itself out of what you browse. Open a few courses and it fills in.
       {% endif %}
     </p>
   </div>
-  <form method="post" action="/me/refresh">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
-    <button class="btn btn-ghost" type="submit">Refresh</button>
-  </form>
+
+  {% if target %}
+  <a class="career-tile" href="/career#plan">
+    <span class="dial dial-sm" style="--pct: {{ ((held_count / skill_rows|length * 100) if skill_rows else 0)|round }}">
+      <span>{{ held_count }}<small>/{{ skill_rows|length }}</small></span>
+    </span>
+    <span class="career-tile-text">
+      <strong>{{ target.name }}</strong>
+      <span class="muted small">skills you can do · see your plan →</span>
+    </span>
+  </a>
+  {% else %}
+  <a class="career-tile career-tile-empty" href="/career">
+    <span aria-hidden="true">✦</span>
+    <span class="career-tile-text">
+      <strong>Where next?</strong>
+      <span class="muted small">Build your career path with AI</span>
+    </span>
+  </a>
+  {% endif %}
 </section>
+
+{% if board.in_progress %}
+<section class="shelf">
+  <div class="shelf-head">
+    <div><h2 class="shelf-title">Continue learning</h2></div>
+    <a class="shelf-link" href="/courses">Find something new →</a>
+  </div>
+  <div class="learn-list">
+    {% for row in board.in_progress[:4] %}{{ course_line(row, editable=true) }}{% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<div class="section-divider"><h2>What to learn next</h2></div>
 
 {% if pending or request.query_params.get('refreshing') %}
 <div class="banner" id="rec-pending">
@@ -36,41 +96,61 @@
 {% endif %}
 
 {% if rec %}
-<article class="rec" id="rec-block" data-rec-id="{{ rec.id }}">
-  <h2 class="rec-headline">{{ rec.headline }}</h2>
-  <p class="rec-narrative">{{ rec.narrative }}</p>
-
-  <div class="grid rec-grid">
-    {% for entry in items %}
-      {% set p = entry.product %}
-      <article class="card card-rec" data-track-impression
-               data-product-slug="{{ p.slug }}" data-position="{{ entry.rank }}">
-        <button type="button" class="card-dismiss" title="Not interested"
-                aria-label="Not interested in {{ p.title }}"
-                data-track-click="dismiss" data-product-slug="{{ p.slug }}"
-                data-position="{{ entry.rank }}" data-source="recommendation">&times;</button>
-        <a class="card-link" href="/products/{{ p.slug }}"
-           data-track-click="rec_click" data-product-slug="{{ p.slug }}"
-           data-position="{{ entry.rank }}" data-source="recommendation">
-          {{ media(p) }}
-          <div class="card-body">
-            <div class="card-top">
-              <span class="pill pill-{{ p.tier }}">{{ p.tier }}</span>
-              <span class="pill pill-cat">{{ p.category|track }}</span>
-            </div>
-            <h3 class="card-title">{{ p.title }}</h3>
-            <p class="rec-reason">{{ entry.reason }}</p>
-            <div class="card-foot">
-              <span class="price">{{ p.price_cents|money }}</span>
-              <span class="muted">★ {{ '%.1f'|format(p.rating) }}</span>
-            </div>
-          </div>
-        </a>
-      </article>
-    {% endfor %}
+<article class="shelf rec" id="rec-block" data-rec-id="{{ rec.id }}" data-shelf>
+  <div class="shelf-head">
+    <div>
+      <h2 class="shelf-title">Recommended for you</h2>
+      <p class="shelf-sub muted">
+        {{ rec.headline }} · refreshed {{ rec.created_at.strftime('%d %b, %H:%M') }}
+      </p>
+    </div>
+    <form method="post" action="/me/refresh">
+      <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+      <button class="btn btn-ghost btn-sm" type="submit">Refresh</button>
+    </form>
   </div>
 
-  {% if rec.cta %}<p class="rec-cta">{{ rec.cta }}</p>{% endif %}
+  <p class="rec-narrative">{{ rec.narrative }}</p>
+
+  <div class="shelf-viewport">
+    <button type="button" class="shelf-nav shelf-prev" aria-label="Scroll recommendations left">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+    </button>
+    <div class="shelf-track" data-shelf-track>
+      {% for entry in items %}
+        {% set p = entry.product %}
+        <article class="card card-rec" data-track-impression
+                 data-product-slug="{{ p.slug }}" data-position="{{ entry.rank }}">
+          <button type="button" class="card-dismiss" title="Not interested"
+                  aria-label="Not interested in {{ p.title }}"
+                  data-track-click="dismiss" data-product-slug="{{ p.slug }}"
+                  data-position="{{ entry.rank }}" data-source="recommendation">&times;</button>
+          <a class="card-link" href="/products/{{ p.slug }}"
+             data-track-click="rec_click" data-product-slug="{{ p.slug }}"
+             data-position="{{ entry.rank }}" data-source="recommendation">
+            {{ media(p) }}
+            <div class="card-body">
+              <div class="card-top">
+                <span class="pill pill-{{ p.tier }}">{{ p.tier }}</span>
+                <span class="pill pill-cat">{{ p.category|track }}</span>
+              </div>
+              <h3 class="card-title">{{ p.title }}</h3>
+              <p class="rec-reason">{{ entry.reason }}</p>
+              <div class="card-foot">
+                <span class="price">{{ p.price_cents|money }}</span>
+                <span class="muted">★ {{ '%.1f'|format(p.rating) }}</span>
+              </div>
+            </div>
+          </a>
+        </article>
+      {% endfor %}
+    </div>
+    <button type="button" class="shelf-nav shelf-next" aria-label="Scroll recommendations right">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
+    </button>
+  </div>
 </article>
 {% elif not pending %}
 <div class="empty-state">
@@ -79,12 +159,50 @@
     SmartReco needs a little behaviour to work with. Browse the catalogue, search for
     something you actually want to learn, and your recommendations will appear here.
   </p>
-  <a class="btn btn-primary" href="/">Start browsing</a>
+  <a class="btn btn-primary" href="/courses">Start browsing</a>
 </div>
 {% endif %}
 
-<section class="why">
-  <h2 class="section-title">Why these?</h2>
+{% for s in shelves %}{{ shelf(s) }}{% endfor %}
+
+{% if board.completed or board.saved %}
+<div class="section-divider"><h2>Your library</h2></div>
+<div class="learn-columns">
+  {% if board.completed %}
+  <section>
+    <h3 class="section-title">
+      Completed
+      {% if board.certificates %}
+        <span class="muted small">· {{ board.certificates|length }} certificate{{ 's' if board.certificates|length != 1 }}</span>
+      {% endif %}
+    </h3>
+    <div class="learn-list">
+      {% for row in board.completed %}
+        <article class="learn-row">
+          <a class="learn-title" href="/products/{{ row.product.slug }}">{{ row.product.title }}</a>
+          <span class="muted small">
+            {{ row.product.instructor or row.product.brand }}
+            {% if row.certificate_code %}· <span class="mono">{{ row.certificate_code }}</span>{% endif %}
+          </span>
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if board.saved %}
+  <section>
+    <h3 class="section-title">Saved for later</h3>
+    <div class="learn-list">
+      {% for row in board.saved %}{{ course_line(row) }}{% endfor %}
+    </div>
+  </section>
+  {% endif %}
+</div>
+{% endif %}
+
+<details class="why" id="why">
+  <summary><span class="section-title">Why these?</span></summary>
   {% if evidence %}
     <p class="muted">These are the only signals the agent was allowed to use — nothing else.</p>
     <ul class="evidence">
@@ -92,6 +210,19 @@
     </ul>
   {% else %}
     <p class="muted">No activity recorded yet.</p>
+  {% endif %}
+
+  {% if skill_rows %}
+  <h3 class="section-title">Skills for {{ target.name }}</h3>
+  <ul class="skill-progress">
+    {% for row in skill_rows %}
+      <li class="{{ 'is-held' if row.held }}">
+        <span class="skill-tick" aria-hidden="true">{{ '✓' if row.held else '' }}</span>
+        <a href="/explore/skills/{{ row.slug }}">{{ row.name }}</a>
+        {% if not row.held %}<a class="link small" href="/courses?skill={{ row.slug }}">find a course</a>{% endif %}
+      </li>
+    {% endfor %}
+  </ul>
   {% endif %}
 
   {% if profile and profile.interests %}
@@ -113,7 +244,10 @@
     what you looked at last month.
   </p>
   {% endif %}
-</section>
+</details>
 {% endblock %}
 
-{% block scripts %}<script src="/static/js/dashboard.js" defer></script>{% endblock %}
+{% block scripts %}
+<script src="/static/js/shelf.js" defer></script>
+<script src="/static/js/dashboard.js" defer></script>
+{% endblock %}

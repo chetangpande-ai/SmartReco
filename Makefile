@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install seed run test lint fmt eval migrate reset digest docker clean
+.PHONY: help install seed run test lint fmt catalogue eval migrate reset digest docker clean
 
 help:  ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}'
@@ -24,6 +24,9 @@ cov:  ## Run tests with a coverage report
 
 lint:  ## Check formatting and lint rules
 	uv run ruff check app tests scripts
+
+catalogue:  ## Check the course catalogue against the taxonomy
+	uv run python -m scripts.check_catalogue
 
 fmt:  ## Apply safe lint fixes
 	uv run ruff check app tests scripts --fix

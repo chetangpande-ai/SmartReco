@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% from "_course_card.html" import course_card %}
+{% block title %}{{ skill.name }} — SmartReco{% endblock %}
+
+{% block content %}
+<section class="hero">
+  {% if subcategory %}
+    <a class="back-link" href="/explore/categories/{{ subcategory.category }}">
+      ← {{ subcategory.category|track }} · {{ subcategory.name }}
+    </a>
+  {% else %}
+    <a class="back-link" href="/explore">← Explore learning</a>
+  {% endif %}
+  <span class="eyebrow">Skill</span>
+  <h1>{{ skill.name }}</h1>
+  <p class="lede">
+    {{ total }} course{{ 's' if total != 1 }} teach{{ '' if total != 1 else 'es' }} it.
+    {% if roles %}It is a listed requirement for {{ roles|length }} role{{ 's' if roles|length != 1 }}.{% endif %}
+  </p>
+</section>
+
+{% if roles or paths %}
+<div class="skill-context">
+  {% if roles %}
+  <section class="card-panel">
+    <h3>Roles that ask for this</h3>
+    <div class="topics topics-tight">
+      {% for r in roles %}<a class="topic" href="/courses?role={{ r.slug }}">{{ r.name }}</a>{% endfor %}
+    </div>
+  </section>
+  {% endif %}
+  {% if paths %}
+  <section class="card-panel">
+    <h3>Career paths it appears on</h3>
+    <div class="topics topics-tight">
+      {% for p in paths %}<a class="topic" href="/careers/{{ p.slug }}">{{ p.name }}</a>{% endfor %}
+    </div>
+  </section>
+  {% endif %}
+  {% if specialisms %}
+  <section class="card-panel">
+    <h3>Goes deeper into</h3>
+    <div class="topics topics-tight">
+      {% for s in specialisms %}
+        {% if s %}<a class="mini-chip" href="/explore/skills/{{ s.slug }}">{{ s.name }}</a>{% endif %}
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if courses %}
+<div class="section-divider"><h2>Courses that teach {{ skill.name }}</h2></div>
+<div class="grid grid-courses">
+  {% for p in courses %}{{ course_card(p, loop.index0, 'skill') }}{% endfor %}
+</div>
+{% if total > courses|length %}
+  <p><a class="btn btn-ghost" href="/courses?skill={{ skill.slug }}">See all {{ total }} →</a></p>
+{% endif %}
+{% else %}
+<div class="empty-state">
+  <h2>No course covers this yet</h2>
+  <p class="muted">
+    {{ skill.name }} is in the taxonomy but nothing in the catalogue teaches it. That gap
+    is deliberate to show rather than hide — it is what the catalogue is missing.
+  </p>
+  <a class="btn btn-primary" href="/explore">Browse what is here</a>
+</div>
+{% endif %}
+{% endblock %}

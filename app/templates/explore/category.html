@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% from "_course_card.html" import course_card %}
+{% block title %}{{ node.name }} — SmartReco{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <a class="back-link" href="/explore">← Explore learning</a>
+  <h1>{{ node.name }}</h1>
+  <p class="lede">
+    {{ node.subcategories|length }} topic areas, {{ node.topics|length }} skills,
+    {{ total }} course{{ 's' if total != 1 }}.
+  </p>
+  <a class="btn btn-primary" href="/courses?category={{ node.slug }}">See all {{ total }} courses</a>
+</section>
+
+<div class="sub-grid">
+  {% for sub in node.subcategories %}
+  <section class="sub-card">
+    <h3><a href="/courses?category={{ node.slug }}&sub={{ sub.key|urlencode }}">{{ sub.name }}</a></h3>
+    <div class="topics topics-tight">
+      {% for slug in sub.topics %}
+        <a class="mini-chip" href="/explore/skills/{{ slug }}">{{ slug|skill }}</a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+</div>
+
+{% if courses %}
+<div class="section-divider"><h2>Top courses in {{ node.name }}</h2></div>
+<div class="grid grid-courses">
+  {% for p in courses %}{{ course_card(p, loop.index0, 'category') }}{% endfor %}
+</div>
+{% endif %}
+{% endblock %}

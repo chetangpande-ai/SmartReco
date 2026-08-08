@@ -67,6 +67,20 @@ changes enough that scores from `make eval-llm` before and after aren't comparab
 column is what makes "did quality change after that prompt edit" a query instead of a
 guess, once there's enough run history to look back over.
 
+The career layer added two more versioned prompts, `ADVISOR_PROMPT_VERSION` and
+`FIT_PROMPT_VERSION`, under the same convention. Neither is covered by `make eval-llm`
+yet, and the reason is worth stating rather than hiding: the generation evals score
+copy against a retrieved candidate set, and these two prompts do not choose anything —
+the plan and the prerequisite verdict are computed before the model is called, so the
+only thing left to score is prose quality. The claims that *could* be wrong are
+[asserted directly in `tests/test_career.py`](../tests/test_career.py) instead, offline
+and free: that the ordering never precedes a prerequisite, that a tester is not told to
+learn testing, and that the fit check refuses when a prerequisite is missing.
+
+`make catalogue` is the third check in this family. A skill slug that drifts out of the
+taxonomy does not raise — it silently produces a roadmap step with no course behind it,
+so `scripts/check_catalogue.py` fails CI on it.
+
 ## PII
 
 `app/services/pii.py` is the single source of truth for PII patterns (email, phone,

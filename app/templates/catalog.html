@@ -3,25 +3,59 @@
 {% block title %}Courses — SmartReco{% endblock %}
 
 {% block content %}
-<section class="hero">
-  <h1>Browse. We'll work out what you're actually trying to learn.</h1>
-  <p class="lede">SmartReco watches which courses genuinely hold your attention and builds
-     a recommendation around it — grounded in the real catalogue, never invented.</p>
+{#
+  The career hero comes before the catalogue on purpose. Every learning platform can
+  show you a grid of courses; the question this one answers is which of them you should
+  take and in what order, and that has to be the first thing on the page.
+#}
+<section class="career-banner">
+  <div class="career-banner-text">
+    <span class="eyebrow">🎯 AI Career Advisor</span>
+    <h1>Where do you want your career to go?</h1>
+    <p class="lede">
+      Tell us where you are today. AI will create your personalised path to where you
+      want to be — the skills that already count, the ones genuinely missing, and the
+      order to close them in.
+    </p>
+    <div class="career-banner-actions">
+      <a class="btn btn-primary btn-lg" href="/career">Build my career path with AI</a>
+      <a class="btn btn-ghost btn-lg" href="/careers">Browse career paths</a>
+    </div>
+    {% if plan %}
+      <p class="muted">
+        You have a plan in progress —
+        <a class="link" href="/career#plan">{{ plan.headline }}</a>
+        ({{ '%.0f'|format(plan.readiness * 100) }}% ready)
+      </p>
+    {% endif %}
+  </div>
+  <ul class="career-banner-paths">
+    {% for p in home_paths %}
+      <li><a href="/careers/{{ p.slug }}">
+        <span class="path-arrow" aria-hidden="true">→</span> {{ p.name }}
+      </a></li>
+    {% endfor %}
+  </ul>
 </section>
 
+{# No category tiles here. The browse bar under the header already lists every track,
+   and a second grid of the same links two hundred pixels below it made the page look
+   like it had three different places to start. #}
+<div class="section-divider"><h2>The catalogue</h2></div>
+
+{# Tracks live in the browse bar in base.html, so this row is levels only — two
+   category pickers stacked on top of each other read as a rendering mistake. #}
 <div class="filters">
-  <a class="chip {% if not active_category %}chip-on{% endif %}"
-     href="/" data-track-filter="category" data-value="">All</a>
-  {% for c in categories %}
-    <a class="chip {% if active_category == c %}chip-on{% endif %}"
-       href="/?category={{ c }}" data-track-filter="category" data-value="{{ c }}">{{ c|track }}</a>
-  {% endfor %}
-  <span class="filter-sep"></span>
+  <a class="chip {% if not active_tier %}chip-on{% endif %}"
+     href="/{% if active_category %}?category={{ active_category }}{% endif %}"
+     data-track-filter="tier" data-value="">All levels</a>
   {% for t in ['beginner', 'intermediate', 'advanced'] %}
     <a class="chip {% if active_tier == t %}chip-on{% endif %}"
        href="/?{% if active_category %}category={{ active_category }}&{% endif %}tier={{ t }}"
        data-track-filter="tier" data-value="{{ t }}">{{ t }}</a>
   {% endfor %}
+  <span class="filter-sep"></span>
+  <a class="chip" href="/courses">All filters →</a>
 </div>
 
 <div class="grid">

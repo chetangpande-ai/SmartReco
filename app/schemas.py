@@ -98,6 +98,30 @@ class ProductIn(BaseModel):
     rating: float = Field(default=0.0, ge=0.0, le=5.0)
     is_published: bool = True
 
+    # ---- marketplace metadata ----
+    # Every one defaults, so the admin form, the tests and any existing caller that
+    # predates the career layer keep working untouched.
+    subcategory: str = Field(default="", max_length=80)
+    format: str = Field(default="Self-Paced Course", max_length=40)
+    duration_hours: int = Field(default=0, ge=0, le=10_000)
+    language: str = Field(default="English", max_length=24)
+    delivery_mode: str = Field(default="Self-Paced", max_length=24)
+    certificate: bool = False
+    instructor: str = Field(default="", max_length=120)
+    learners: int = Field(default=0, ge=0)
+    reviews: int = Field(default=0, ge=0)
+    objectives: list[str] = Field(default_factory=list)
+    curriculum: list[str] = Field(default_factory=list)
+    projects: list[str] = Field(default_factory=list)
+    labs: int = Field(default=0, ge=0)
+    assessments: int = Field(default=0, ge=0)
+
+    # Canonical taxonomy slugs. Not part of the Product row — `catalog.create_product`
+    # writes them to `course_skills`, which is what makes "which courses teach RAG?"
+    # an indexed query rather than a scan over JSON.
+    teaches: list[str] = Field(default_factory=list)
+    requires: list[str] = Field(default_factory=list)
+
     @field_validator("tier")
     @classmethod
     def _known_tier(cls, v: str) -> str:
@@ -110,6 +134,22 @@ class ProductIn(BaseModel):
     @classmethod
     def _clean_tags(cls, v: list[str]) -> list[str]:
         return [t.strip().lower() for t in v if t.strip()][:12]
+
+    @field_validator("teaches", "requires")
+    @classmethod
+    def _canonical_skills(cls, v: list[str]) -> list[str]:
+        """Whatever spelling the caller used, stored as one canonical slug.
+
+        Free text goes through the same resolver as a learner's typed skill list, so an
+        admin adding "AI Evals" and a learner typing "ai evaluation" land on the same
+        row. Anything the taxonomy does not recognise is dropped rather than stored: an
+        unmatched slug in `course_skills` can never be reached by a gap query, so
+        keeping it would only look like a link that exists.
+        """
+        from app.taxonomy import resolve_skills
+
+        known, _ = resolve_skills(v)
+        return known[:24]
 
 
 class ProductOut(BaseModel):

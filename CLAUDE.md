@@ -8,25 +8,67 @@ does not have to re-derive it.
 
 ## What this is
 
-A behavioural recommendation agent for an online **learning platform**. The catalogue is
-35 real courses. Ignore the commit message on `7f4849b` ("changed domain from learning
-courses to electronics") — it is wrong; the domain is courses everywhere, and the schema
-just uses generic names for it (`brand` = provider, `spec` = syllabus line, `tier` =
-beginner/intermediate/advanced).
+A **career learning marketplace** for an online learning platform, with two engines
+under it:
+
+1. **Behavioural recommendation** — a LangGraph agent that watches what you browse and
+   recommends from it. This is the original system.
+2. **The career layer** — a skill graph that answers "what should I learn next to become
+   an X?" from a stated profile rather than from behaviour. Added 2026-08-08.
+
+The catalogue is 66 real courses. Ignore the commit message on `7f4849b` ("changed
+domain from learning courses to electronics") — it is wrong; the domain is courses
+everywhere, and the schema just uses generic names for it (`brand` = provider, `spec` =
+syllabus line, `tier` = beginner/intermediate/advanced).
 
 FastAPI + SQLAlchemy 2 → LangGraph agent → hybrid retrieval over Chroma or Pinecone.
 Every model call leaves through Mesh.
 
+## The career layer
+
+Three files hold it, and the split matters:
+
+- **`app/taxonomy.py`** — the vocabulary, loaded once at import from
+  `app/data/taxonomy.json`. Categories, subcategories, topics, 22 career roles with
+  their required skills, 10 career paths with ordered steps. No table, no migration:
+  it is versioned with the code because it changes with releases, not with users.
+- **`app/data/courses.py`** — the 66 courses, each declaring what it `teaches` and what
+  it `requires` as canonical taxonomy slugs. `app/seed.py` is only the loader.
+- **`app/services/advisor.py`** — the engine. `analyse()` is deterministic: set
+  difference against the role's requirements, then a walk down the career path resolving
+  each gap to a course whose prerequisites the previous step already satisfied.
+
+**The model does not choose the courses.** It writes the narrative around an analysis
+that is already complete, and there is a template fallback under it — `LLM_ENABLED=false`
+still produces a full, correct plan. That division is the whole design: "which course
+next" is answerable from the skill graph, and a career plan is the most consequential
+thing this platform says to anyone.
+
+Three rules in the ranking do most of the quality work. Each exists because its absence
+produced a specifically bad plan:
+
+- **Skills imply skills** (`taxonomy._IMPLIES`). Someone who says "Selenium, API testing"
+  has been testing for a living. A literal set difference against a role asking for
+  "Testing" told a ten-year tester to learn testing.
+- **Seniority is per-skill, not global** (`advisor._target_tier`). Ten years of testing
+  says nothing about meeting machine learning for the first time. Applying seniority
+  everywhere opened a plan with a 60-hour advanced course on an unfamiliar subject.
+- **Interview-prep courses never teach a gap** (`advisor.NON_TEACHING_FORMATS`). They
+  list Python because their problems are written in it. Without the exclusion, the plan
+  for a Java developer opened with "Grokking the Coding Interview" to learn Python.
+
 ## Commands
 
 ```bash
-make install   # uv sync --all-extras
-make seed      # 35 courses + 3 users, idempotent
-make run       # :8000
-make test      # 314 tests, offline, ~40s
-make cov       # coverage, currently 90%
-make lint      # ruff, currently clean
-make eval      # retrieval quality, needs a live index
+make install    # uv sync --all-extras
+make migrate    # alembic upgrade head — run before `seed` on an existing database
+make seed       # 66 courses + 3 users, converges rather than skips
+make run        # :8000
+make test       # 426 tests, offline, ~50s
+make cov        # coverage, currently 91%
+make lint       # ruff, currently clean
+make catalogue  # courses vs taxonomy, currently 0 problems
+make eval       # retrieval quality, needs a live index
 ```
 
 **The first `uv run` in a fresh session syncs the environment and can take minutes.** A
@@ -43,12 +85,16 @@ them in prose, so if you change one, grep for it there.
 |---|---|---|
 | Graph nodes | **9** | `app.agent.graph.describe()["nodes"]` |
 | Conditional edges | **6**, from 3 branch points | `describe()["edges"]` |
-| Tables | **10** — 9 related + `embedding_cache` | `models.Base.metadata.tables` |
+| Tables | **14** — 13 related + `embedding_cache` | `models.Base.metadata.tables` |
 | Deterministic guardrail checks | **35** = 31 regex + 4 cross-checks | the three rail lists in `services/guardrails.py` |
 | Trigger gates | **11** | `services/triggers.evaluate` |
-| Seeded courses | **35** | `COURSES` in `app/seed.py` |
+| Seeded courses | **66** | `COURSES` in `app/data/courses.py` |
+| Taxonomy categories / skills | **21 / 628** | `taxonomy.taxonomy()` |
+| Career roles / paths | **22 / 10** | `taxonomy.roles()`, `taxonomy.paths()` |
+| Roadmap stages | **8** | `taxonomy.ROADMAP_STAGES` |
 | Event types | **12** current + 2 retired aliases | `schemas.EVENT_TYPES` |
-| Tests / coverage | **314 / 90%** | `make cov` |
+| Tests / coverage | **426 / 91%** | `make cov` |
+| Catalogue ↔ taxonomy | **0 problems** | `make catalogue` |
 
 `node_path` counts `coldstart` as a real node; the numbered comments in `nodes.py` label
 it `3b`, which is where the old "eight nodes" claim came from.
@@ -68,6 +114,23 @@ tracker.js → POST /api/events → 202 in ~3ms
 ```
 
 Only `grade` and `generate` spend tokens. `analyze` is deterministic on purpose.
+
+## Invariants that will bite you (career layer)
+
+- **`main.py` runs `create_all` at startup, and alembic owns the schema too.** Anyone
+  who starts the app before migrating gets new tables without new columns. The
+  `9c41ab7e5d02` migration guards every create for exactly that reason — do not
+  "clean it up" into plain `op.create_table` calls.
+- **Subcategory ids are only unique within a category.** `tools` is both a Project
+  Management and a UI/UX subcategory. Everything keys on `Subcategory.key`
+  (`category/sub`); keying on the bare id silently merges them.
+- **Stage dicts use `entries`, not `items`.** Jinja resolves `stage.items` to the dict
+  *method* and renders nothing, with no error.
+- **A course must never both teach and require the same skill.** It sends the advisor in
+  a circle. `make catalogue` fails on it.
+- **`ProductIn` canonicalises and drops unknown skills.** An unrecognised slug in
+  `course_skills` can never be reached by a gap query, so it would be a link that only
+  looks like it exists.
 
 ## Invariants that will bite you
 

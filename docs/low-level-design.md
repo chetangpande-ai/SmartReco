@@ -189,3 +189,76 @@ module docstring says so rather than overclaiming.
   the test suite itself pins `EXPLORE_EPSILON=0` process-wide (`tests/conftest.py`) so
   real randomness never leaks into an assertion that happens to have more than `top_k`
   candidates.
+
+## `app/taxonomy.py` — one vocabulary, three sources
+
+The source JSON writes skills as prose, and the same skill arrives spelled three ways:
+`AI Evals` on the AI Engineer *role*, `AI Evaluation` on the AI Engineer *path*,
+`AWS/Azure/GCP` as one string covering three skills. Everything is canonicalised to a
+slug on load, so downstream code compares slugs and never strings.
+
+- **`_SPLIT`** — the handful of source names that are genuinely several skills. An
+  explicit list rather than "split on slash", because `CI/CD` is one skill whose name
+  contains one.
+- **`_ALIASES`** — second names folded into a canonical slug. Doubles as the matcher for
+  free text a learner types, which is why informal spellings (`ml`, `genai`, `k8s`,
+  `dsa`) are in there.
+- **`_IMPLIES` + `expand_skills()`** — having a skill means having the ones it entails.
+  Closed transitively rather than one level deep: RAG implies LLMs implies Generative AI
+  implies LLM Fundamentals, and a single pass stops three skills short. This is what
+  stops the advisor telling a ten-year tester to learn testing.
+- **`Subcategory.key`** — `category/sub`, because subcategory ids are only unique inside
+  their category. `tools` is both a Project Management and a UI/UX subcategory; keyed on
+  the bare id, one silently replaces the other.
+
+## `app/services/advisor.py` — the skill-gap engine
+
+`analyse()` is deterministic end to end. The model is called afterwards, for prose only,
+and there is a template fallback under it — `LLM_ENABLED=false` produces the same plan.
+
+1. **Held skills** = stated skills + skills from *completed* enrollments, then
+   `expand_skills()`. Completions count because they are the one claim on the page that
+   can be verified.
+2. **Required** = the target role's skills, or the path's own steps when the path
+   describes a job the role list does not name (Generative AI Engineer).
+3. **Order** comes from the career path, not the role. A role's skill list is an
+   unordered job description; a path is a teaching sequence someone thought about.
+   Requirements the path never mentions are appended so nothing vanishes.
+4. **Course per gap**, ranked by `_rank()` — lower is better:
+   `(unmet prerequisites, tier distance, position of the skill in the course's own list,
+   -rating, -reviews)`.
+
+Three rules in that ranking each exist because their absence produced a specific bad
+plan, and each is pinned by a test:
+
+- **`unmet` dominates.** A rating-first ranking hands someone the best-rated RAG course,
+  which is also the one assuming they already know RAG.
+- **`_target_tier()` is per-skill.** Seniority applies only where the learner already
+  works — judged by whether they hold any skill from the same part of the catalogue.
+  Applied globally, fifteen years of QA opened a plan with a 60-hour advanced course on
+  a subject the learner had never touched.
+- **`NON_TEACHING_FORMATS`.** Interview-prep courses list Python because their problems
+  are written in it. Without the exclusion, the plan for a Java developer opened with
+  *Grokking the Coding Interview* to learn Python.
+
+After a course is chosen, everything it teaches is marked held, so the next gap is ranked
+against a learner who has already taken it. That is what makes the output a sequence
+rather than a list, and it is asserted directly:
+`test_a_course_never_precedes_its_own_prerequisites` walks the plan and checks it.
+
+`_stages()` composes the eight `taxonomy.ROADMAP_STAGES` into plain JSON stored on
+`CareerPlan.stages`, so an old plan stays renderable after the catalogue moves. The list
+key is `entries`, not `items` — Jinja resolves `stage.items` to the dict *method* and
+renders nothing, silently.
+
+## `app/services/learning.py` — enrollment state
+
+Separate from the `enroll` event on purpose. The event is an immutable record that a
+click happened at a moment in time and feeds the behaviour profile; the row is mutable
+state that changes on every session. Deriving "62% through" by replaying an append-only
+log on each dashboard render would be absurd, and deleting the row must not rewrite
+history — so neither derives from the other.
+
+`set_progress()` is the only place a certificate can be minted, which is what makes
+"issued exactly once, and never revoked by re-opening a finished course" a property of
+one function rather than a convention.

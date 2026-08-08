@@ -1,4 +1,4 @@
-# SmartReco — 3-minute demo recording script
+# SmartReco — 4-minute demo recording script
 
 Follow this top to bottom in one take, no editing required.
 
@@ -7,17 +7,43 @@ Follow this top to bottom in one take, no editing required.
 window — so the recommendation built in Scene 3 is visibly driven by what you do on
 camera, not stale history. Maximize the browser. Start screen capture (Win+G, or OBS).
 
-## Scene 1 — Browse the catalogue (0:00–0:25)
+Run `make seed` first if the catalogue is empty, and `make migrate` if you have not
+applied the career-layer schema.
 
-1. Land on `/` — narrate: *"SmartReco is a behavioural recommendation agent over a
-   35-course catalogue."*
-2. Click a category chip (e.g. "AI & ML"), then a tier chip ("beginner") — show the
-   filters combine.
-3. Point out the **Courses / My picks** nav on the top right.
+## Scene 1 — The career pitch (0:00–0:50)
 
-## Scene 2 — Generate real behavioural signal (0:25–1:00)
+This is the differentiator. Lead with it.
 
-This is the part that makes Scene 3 honest — you're building the profile live.
+1. Land on `/` — narrate: *"A career learning marketplace: 66 courses across 21 tracks,
+   and an AI advisor that works out which of them you should take, in what order."*
+   Point at the banner: **"Where do you want your career to go?"**
+2. Click **Build my career path with AI**, then the
+   **"Load the QA → AI Engineer example"** link (or go straight to `/career?demo=1`).
+   Narrate the inputs as they fill: *"Ten years in QA. Java, Selenium, API testing.
+   Wants to move into AI engineering."*
+3. Hit **Build my career path with AI**. Scroll to the roadmap.
+4. **Linger on the first two stages** — this is the whole argument:
+   - *"It knows Selenium and API testing mean this person has been testing for a living,
+     so it does not put 'learn testing' in their gap list."*
+   - *"The eight steps are ordered so each course only assumes what the one before it
+     taught — Python, then GenAI, then RAG, then agents. Nothing here was chosen by a
+     language model; it is computed from the skill graph. The model wrote the paragraph."*
+5. Scroll on through **Projects → Assessment → Certification → Interview preparation →
+   Target role.** Narrate: *"From where you are, to where you want to be."*
+
+## Scene 2 — Browse the catalogue (0:50–1:15)
+
+1. Click **Explore** — narrate: *"The taxonomy underneath: 21 categories, 628 skills."*
+   Click into a category, then a skill (e.g. RAG) — point at **"Roles that ask for this"**.
+   *"Every skill page is also a career page."*
+2. Click **Explore courses** and stack two or three filters — category, career role,
+   free. Narrate: *"Filters are links, so any combination is a shareable URL."*
+3. Open a course. Click **"Ask AI if this course is right for me"** — narrate:
+   *"It is willing to say no. The prerequisite check is computed, not guessed."*
+
+## Scene 3 — Generate real behavioural signal (1:15–1:50)
+
+This is the part that makes the next scene honest — you're building the profile live.
 
 1. Search for something specific, e.g. "machine learning" — narrate: *"Every search,
    click, and dwell gets tracked."*
@@ -25,20 +51,22 @@ This is the part that makes Scene 3 honest — you're building the profile live.
    seconds (dwell time is a real signal — see `EVENT_WEIGHTS` in `app/services/profile.py`).
 3. Add one to your wishlist / cart if that action exists on the product page.
 
-## Scene 3 — Sign in and get the recommendation (1:00–1:40)
+## Scene 4 — Sign in and get the recommendation (1:50–2:30)
 
 1. Go to `/login`, sign in as `learner@smartreco.dev` / `learner12345`.
 2. Open `/me` — narrate: *"The agent reads that behaviour and writes a recommendation
    grounded only in the real catalogue."*
-3. **Point at the "Why these?" evidence panel** — narrate: *"These are the only facts the
-   model was allowed to cite — nothing invented."* This is the single most
-   differentiating screen in the app; linger here 5–8 seconds.
+3. Point at the **career tile** top-right of the greeting: *"Three of the nine skills
+   AI Engineer asks for — and it moves as they finish courses, because a completed
+   course is the one claim on this page we can actually verify."*
+4. **Open the "Why these?" panel at the bottom** — narrate: *"These are the only facts
+   the model was allowed to cite — nothing invented."* Linger here 5–8 seconds.
 
-## Scene 4 — Admin operations (1:40–2:30)
+## Scene 5 — Admin operations (2:30–3:20)
 
 1. Sign out, log back in as `admin@smartreco.dev` / `admin12345`.
 2. Point out the top-right **account chip** — avatar with the shield badge, name, Sign
-   out grouped separately from **Courses / My picks / Operations** nav.
+   out grouped separately from the **Explore / Careers / My learning** nav.
 3. Click **Operations** → narrate over the dashboard:
    - *"SQL↔vector sync health"* — point at the "in sync" badge.
    - *"LLM call efficiency — the trigger policy decided most requests didn't need a
@@ -51,10 +79,10 @@ This is the part that makes Scene 3 honest — you're building the profile live.
 5. Click **Catalogue** tab → **Add course** — narrate: *"Admins manage the catalogue
    directly; publishing triggers a dual-write to the vector index."*
 
-## Scene 5 — Close (2:30–2:50)
+## Scene 6 — Close (3:20–3:50)
 
 1. Back to `/admin`, click **"Run digest now"** — narrate: *"The daily digest job,
    runnable on demand for the demo."*
-2. End on the `/me` recommendation screen — narrate: *"Grounded retrieval, an
+2. End on the `/career` roadmap screen — narrate: *"Grounded retrieval, an
    LLM-as-judge grading loop, a groundedness verifier, and a deterministic fallback if
    anything fails — the agent never ships an ungrounded answer."*

@@ -1,14 +1,22 @@
 # SmartReco
 
-**A behavioural AI recommendation agent for an online learning platform.**
+**A career learning marketplace with an AI agent that decides what each learner should
+study next — and why.**
 
-It watches  how each learner actually behaves, reasons over that behaviour with a
-LangGraph agent, retrieves matching courses from a vector database, and writes a
+Two engines, deliberately different. A **LangGraph agent** watches how each learner
+actually behaves, retrieves matching courses from a vector database, and writes a
 persuasive recommendation that is *grounded in the real catalogue* and *checked for
-honesty* before anyone sees it.
+honesty* before anyone sees it. Alongside it, an **AI Career Advisor** takes a stated
+background and target role and computes the skill gap between them — which of your
+skills already count, which are genuinely missing, and the order to close them in.
+
+The division matters: in the career engine the model **never picks a course**. The plan
+comes from a skill graph and is handed to the model as settled fact; it writes only the
+paragraph around it.
 
 - **Behavioural tracking** — search, clicks, dwell time, wishlist/enroll/dismiss, captured without slowing the page down
 - **An agent that reasons**, not a template — LangGraph, hybrid retrieval, LLM-as-judge grading, a groundedness verifier
+- **A career skill graph** — 21 categories, 628 skills, 22 roles, 10 career paths, joined to the catalogue so "what should I learn next?" is answerable, not guessed
 - **Collaborative filtering + a heuristic ranker** on top of content-based retrieval, with an exploration slot so the same best guess doesn't compound forever
 - **Guardrails, evals and red-teaming** — deterministic rails always on, DeepEval metrics, adversarial probes against the real generation path
 - **Cost control by design** — an 11-gate trigger policy, daily budget, circuit breaker, and a ranker that skips the LLM call when it's already confident
@@ -59,7 +67,7 @@ honesty* before anyone sees it.
             ▼                      ▼                ▼              ▼
      ┌─────────────┐      ┌──────────────┐   ┌────────────┐  ┌───────────┐
      │ SQLite / PG │      │   Mesh API   │   │  ChromaDB  │  │   SMTP    │
-     │  10 tables  │      │ chat + embed │   │ / Pinecone │  │ / file    │
+     │  14 tables  │      │ chat + embed │   │ / Pinecone │  │ / file    │
      └─────────────┘      └──────────────┘   └────────────┘  └───────────┘
 ```
 
@@ -81,6 +89,29 @@ management — in [`docs/architecture.md`](docs/architecture.md).
 - Hourly `reconcile()` diffs SQL against the index by content hash and repairs `missing`, `stale` and `orphaned` drift — all three verified live on **both** vector backends
 - Unpublishing enqueues a delete, so the index holds *exactly* the published courses
 
+**A career graph, not just a course grid** — the AI Career Advisor
+- `Category → Subcategory → Topic → Skill → Course → Career Path → Career Role`, all one
+  skill vocabulary: **21 categories, 628 skills, 22 roles, 10 career paths**, loaded from
+  [`app/data/taxonomy.json`](app/data/taxonomy.json) and joined to courses through
+  `course_skills`. Adding a role or a path is a data edit — no template changes
+- Tell it where you are and where you want to be, and it computes **what you already
+  have, what is genuinely missing, and the order to close it in** — then renders an
+  eight-stage roadmap: *current skills → skills to learn → courses → projects →
+  assessment → certification → interview prep → target role*
+- **The model does not choose the courses.** The plan is computed from the skill graph
+  and handed to the model as settled fact; it writes the narrative around it. A template
+  fallback produces the same plan with `LLM_ENABLED=false`, which is how the tests run
+- Three rules do the quality work, each earned by a specifically bad plan it prevents:
+  **skills imply skills** (a ten-year tester is not told to learn testing), **seniority
+  is per-skill** (fifteen years of QA does not skip the intro to machine learning), and
+  **interview-prep courses never teach a gap** (they list Python because their problems
+  are written in it)
+- **"Ask AI if this course is right for me"** on every course page, and it is willing to
+  say no: the prerequisite check is computed, not guessed, so it answers *"not yet — this
+  assumes Python and LLM Fundamentals"* rather than always saying yes
+- `make catalogue` fails the build when a skill slug drifts, because a typo there does
+  not raise — it silently produces a roadmap step with no course behind it
+
 **An agent that reasons, not a template**
 - **LangGraph**: 9 nodes and 3 branch points (6 conditional edges), a bounded refine loop (≤2) and a repair loop (×1)
 - Hybrid retrieval — vector kNN ⊕ BM25 → **RRF** → metadata filters → **MMR** → LLM re-rank
@@ -99,8 +130,8 @@ management — in [`docs/architecture.md`](docs/architecture.md).
 - Returns **fewer** than `REC_TOP_K` rather than padding with a filler
 
 **Measured and red-teamed, not just guardrailed**
-- DeepEval RAG metrics (faithfulness, answer relevancy) plus a custom GEval rubric mirrored line-for-line from the generation prompt's hard rules — `make eval-llm`
-- Adversarial probes against the real `generate → verify` path — prompt injection via a search query, a fake system-role marker, a compromised catalogue description, a roleplay jailbreak — `make red-team`, **4/4 blocked** in a live run
+- DeepEval RAG metrics (faithfulness, answer relevancy) plus a custom GEval rubric mirrored line-for-line from the generation prompt's hard rules — `uv run python scripts/eval_generation.py`
+- Adversarial probes against the real `generate → verify` path — prompt injection via a search query, a fake system-role marker, a compromised catalogue description, a roleplay jailbreak — `uv run python scripts/red_team.py`, **4/4 blocked** in a live run
 - PII is scrubbed on the **input** side (search queries, before they reach a prompt), not just checked on the way out
 - Every run records which prompt version produced it (`AgentRun.prompt_versions`), so a quality shift traces back to the prompt that caused it — see [`docs/evals.md`](docs/evals.md)
 
@@ -113,31 +144,68 @@ management — in [`docs/architecture.md`](docs/architecture.md).
 - **LangSmith** traces the graph with Mesh calls nested as real `llm` runs; **Logfire** traces the request around it; one run reaches both through LangSmith's OTel bridge — all verified against live projects
 - `/admin` shows sync health, LLM calls avoided and why, the compiled graph, every run's node path, prompt versions, tokens, cost and latency
 - APScheduler daily digest, idempotent per `digest:<user>:<date>`
-- **329 tests**, 90% coverage, hermetic and free — `LLM_ENABLED=false` runs everything offline
+- **426 tests**, 91% coverage, hermetic and free — `LLM_ENABLED=false` runs everything offline
 - A [Support / FAQ page](app/templates/support.html) (`/support`) and [four docs](#documentation) covering architecture, low-level design, the full feature inventory and the evals/PII/red-teaming setup
 
 ---
 
 ## What it looks like
 
-**The catalogue** — 35 real courses, filterable by track and level. Artwork is generated
-per slug, so there are no third-party image requests and nothing reads as a missing asset.
+Every image below is captured from a running instance by
+[`scripts/screenshots.py`](scripts/screenshots.py) — re-run it after a UI change rather
+than replacing them by hand, because screenshots rot silently and nothing fails to warn
+you.
 
-![SmartReco catalogue](docs/screenshots/catalogue.png)
+**The home page** leads with the career question, not a course grid. Any learning
+platform can show you a catalogue; the one thing this platform claims is that it knows
+which of those courses *you* should take, and in what order.
 
-**A recommendation**, written by the agent for one learner from that learner's behaviour.
-The *"Why these?"* panel underneath is the part that matters: it lists **the only signals
-the agent was allowed to cite** — the enrolment, the two searches, the dwell times, the
-repeat views. Every claim in the prose above is checkable against that list.
+![SmartReco home page with the AI career advisor banner](docs/screenshots/home.png)
 
-Two details worth looking for: the header reads `agentic · openai/gpt-4o-mini ·
-confidence 68%`, and *Machine Learning Specialization* — the course they already enrolled
-in — is **not** recommended back to them.
+**The roadmap** is the whole argument in one screen. This is a QA engineer of ten years
+moving into AI engineering. Read the first two stages together: *Selenium*, *API Testing*
+and *Java* are marked as **transferring**, and *Testing* is **absent from the gap list**
+— the system knows that someone who lists Selenium has been testing for a living. Then
+the six courses run in an order where each one only assumes what the one before it
+taught: Python → GenAI → agents → AI testing.
 
-![Personalised recommendations with the evidence panel](docs/screenshots/recommendations.png)
+Nothing on this page was chosen by a language model. It is a set difference against the
+role's requirements, walked along a career path.
+
+![QA Engineer to AI Engineer roadmap, eight stages](docs/screenshots/career-roadmap.png)
+
+**The advisor** that produced it. Free text in — *"Java, Selenium, API testing"* — matched
+against a 628-skill vocabulary, so the spelling does not have to be exact and anything
+unrecognised is shown back rather than silently dropped.
+
+![The AI Career Advisor intake form and generated plan](docs/screenshots/career-advisor.png)
+
+**One personal page**, not two. The agent's picks with the reason attached to each card,
+a *"Because you viewed…"* row, the library, and a career dial that reads **3/9** — the
+skills this learner can now do out of the nine the role asks for. That number moves when
+they *complete* a course, because a completed course is the one claim here we can verify.
+
+![The learner dashboard with recommendations and career progress](docs/screenshots/dashboard.png)
+
+**A course page** — objectives, skills, prerequisites, curriculum, labs and projects, plus
+the *"Ask AI if this course is right for me"* button that is willing to answer **no**.
+
+![Course detail page](docs/screenshots/course-detail.png)
+
+**The marketplace** — ten filter groups, all of them links, so any combination of
+category, career role, level, format, duration, price, rating and certificate is a
+shareable URL that survives the back button.
+
+![The filtered course marketplace](docs/screenshots/marketplace.png)
+
+**Explore** — the taxonomy itself: 21 categories and their topic areas, with the
+individual skills one click deeper. Every skill page is also a career page, because the
+roles that need it are one join away.
+
+![Explore learning, browsing the taxonomy](docs/screenshots/explore.png)
 
 **Operations** — SQL↔vector sync health, the trigger policy's skip reasons with a live
-"100% avoided" ratio, the agent graph **read from the compiled LangGraph object** so it
+"avoided" ratio, the agent graph **read from the compiled LangGraph object** so it
 cannot drift from what actually runs, the scheduler's next fire times, and every run's
 node path, grade and refine count. Those
 `analyze→plan→retrieve→grade→refine→retrieve→grade→…` rows are real refine loops.
@@ -151,15 +219,6 @@ node path, grade and refine count. Those
 ```bash
 git clone <your-fork> && cd SmartReco
 cp .env.example .env          # add your MESHAPI_API_KEY (starts with rsk_)
-make install
-make seed
-make run                      # http://localhost:8000
-```
-
-**Windows without `make`** (PowerShell/cmd, e.g. plain VS Code terminal — `make` isn't
-a native Windows command): every target is a one-line `uv` call, so run them directly.
-
-```
 uv sync --all-extras
 uv run python -m app.seed
 uv run uvicorn app.main:app --reload --port 8000    # http://localhost:8000
@@ -189,10 +248,11 @@ mocked out, and it spends nothing. That's the mode the whole test suite runs in.
 6. Open **`/support`** for the FAQ — what's tracked, how recommendations are built, and
    what the app will never claim.
 
-The catalogue is 35 real courses across AI/ML, web dev, data, cloud, security, design,
+The catalogue is 66 real courses across AI/ML, data, software, cloud, DevOps, security,
+testing, product, design,
 product and career — from Andrew Ng's specialisations to Karpathy's Zero to Hero to
 OSCP. Deliberately recognisable, so you can judge for yourself whether a recommendation
-makes sense instead of taking it on trust. `make seed` also generates 24 synthetic
+makes sense instead of taking it on trust. `uv run python -m app.seed` also generates 24 synthetic
 learners with realistic, clustered enrollment patterns — purely so the collaborative-
 filtering leg has real cross-user signal to work with from a fresh clone, never meant to
 be logged into.
@@ -204,7 +264,7 @@ be logged into.
 ### 1. Platform
 
 Email/password auth (bcrypt cost 12, JWT in an `HttpOnly` cookie, CSRF double-submit),
-two roles, and **10 tables** — nine related, plus a standalone embedding cache:
+two roles, and **14 tables** — thirteen related, plus a standalone embedding cache:
 
 ```
 users ─┬─1:1─ user_profiles
@@ -388,9 +448,9 @@ token-bucket rate limiting; CSP and security headers.
 | ⭐ **Retrieval polish** | Hybrid vector+BM25 → RRF → metadata filters → MMR → LLM re-rank. Relevance floor **tuned by sweep, not guessed** |
 | ➕ **Guardrails** | Deterministic rails always on (free, offline); NeMo Guardrails as an opt-in second layer, routed through Mesh |
 | ➕ **Two vector backends** | Chroma locally, Pinecone when deployed, behind one 7-method protocol. **Both verified against live indexes** — identical recall on the same 20 probes, one env var apart |
-| ➕ **Offline eval harness** | 20 paraphrase probes, recall@k + MRR, `make eval` |
-| ➕ **Generation-quality evals** | DeepEval RAG metrics + a custom GEval rubric against the real `generate()` output, routed through Mesh, `make eval-llm` |
-| ➕ **Adversarial red-teaming** | Prompt-injection probes against the live `generate → verify` path (`make red-team`, **4/4 blocked**), plus hermetic no-LLM adversarial tests that run in every CI build |
+| ➕ **Offline eval harness** | 20 paraphrase probes, recall@k + MRR, `uv run python scripts/eval_retrieval.py` |
+| ➕ **Generation-quality evals** | DeepEval RAG metrics + a custom GEval rubric against the real `generate()` output, routed through Mesh, `uv run python scripts/eval_generation.py` |
+| ➕ **Adversarial red-teaming** | Prompt-injection probes against the live `generate → verify` path (`uv run python scripts/red_team.py`, **4/4 blocked**), plus hermetic no-LLM adversarial tests that run in every CI build |
 | ➕ **Prompt versioning** | `AgentRun.prompt_versions` — every run records which prompt version wrote it, visible in `/admin/agent-runs` |
 | ➕ **Input-side PII scrubbing** | Search-query text is redacted before it reaches a prompt (`app/services/pii.py`), not just checked on the way out |
 
@@ -425,7 +485,7 @@ Default is `gpt-4o-mini`; switch `MESHAPI_MODEL` to `kimi-k3` for a demo recordi
 
 A kNN index returns *k* results whether or not any are near. With `k=40` over a
 35-course catalogue that is nearly everything, so those ranks are noise that dilutes rank
-fusion. Sweeping the floor over 20 paraphrase probes (`make sweep`):
+fusion. Sweeping the floor over 20 paraphrase probes (`uv run python scripts/eval_retrieval.py --sweep`):
 
 | ratio | recall@1 | recall@5 | MRR | avg pool |
 |---|---|---|---|---|
@@ -440,7 +500,7 @@ Quality is **flat** across the entire range: the fused ranking is already right,
 floor is not a quality knob here at all — it decides how much noise MMR has to
 diversify over. `retrieve` asks for 8 candidates, so `0.55` (pool 10) leaves a real
 choice while `0.60` and tighter starves it below what was requested. Tuned on one
-catalogue of 35 items — re-run `make sweep` if yours differs.
+catalogue of 35 items — re-run `uv run python scripts/eval_retrieval.py --sweep` if yours differs.
 
 **The probes needed fixing before the numbers meant anything.** A first draft described
 teaching styles with no subject — *"get something working in week one and explain it
@@ -595,17 +655,12 @@ without reading logs — the question you ask once the demo is already running.
 ## Testing
 
 ```bash
-make test      # 329 tests, offline, no API key, spends nothing
-make cov       # coverage report (90%)
-make eval      # retrieval quality against 20 paraphrase probes
-make eval-llm  # DeepEval RAG metrics + custom rubric on real generate() output (costs tokens)
-make red-team  # adversarial prompt-injection probes (costs tokens)
+uv run pytest tests/ -q                                              # 426 tests, offline, no API key, spends nothing
+uv run pytest tests/ -q --cov=app --cov-report=term-missing          # coverage report (91%)
+uv run python scripts/eval_retrieval.py                              # retrieval quality against 20 paraphrase probes
+uv run python scripts/eval_generation.py                             # DeepEval RAG metrics + custom rubric on real generate() output (costs tokens)
+uv run python scripts/red_team.py                                    # adversarial prompt-injection probes (costs tokens)
 ```
-
-Without `make` (Windows): `uv run pytest tests/ -q`, add `--cov=app --cov-report=term-missing`
-for `cov`, `uv run python scripts/eval_retrieval.py` for `eval`, or
-`uv run python scripts/eval_generation.py` / `uv run python scripts/red_team.py` for the
-two above.
 
 | Module | Covers |
 |---|---|
@@ -618,9 +673,10 @@ two above.
 | `test_api.py` | HTTP: auth, CSRF, tracking ingest, admin access control, dual-write over HTTP |
 | `test_observability.py` | sink selection, the OTel bridge, and the two silent failure modes below |
 
-`make eval-llm` and `make red-team` need a real `MESHAPI_API_KEY` and are not run in
-CI — same trade-off `make eval`/`make sweep` already make for retrieval quality, extended
-to generation quality and adversarial robustness. See [`docs/evals.md`](docs/evals.md).
+`uv run python scripts/eval_generation.py` and `uv run python scripts/red_team.py` need a real
+`MESHAPI_API_KEY` and are not run in CI — same trade-off `uv run python scripts/eval_retrieval.py`
+(and its `--sweep` mode) already make for retrieval quality, extended to generation quality and
+adversarial robustness. See [`docs/evals.md`](docs/evals.md).
 
 Several tests are explicitly labelled regressions for bugs found during the build — an
 unpublished course staying recommendable, a search-only learner getting no interest
@@ -654,7 +710,7 @@ Everything is in `.env` (see `.env.example`). The knobs that matter most:
 ```bash
 docker compose up --build                      # SQLite on a volume
 docker compose --profile postgres up --build   # Postgres instead
-make migrate                                   # alembic upgrade head
+uv run alembic upgrade head                    # apply database migrations
 ```
 
 Multi-stage image, non-root user, healthcheck, `data/` on a volume. CI runs lint,
@@ -700,14 +756,15 @@ and the stubs had agreed with every one of them:
 |---|---|---|
 | An existing index of the wrong dimension was reused | The stub only ever created a fresh index | Every upsert fails inside the outbox worker, minutes later, dead-lettering the catalogue |
 | `reset()` 404s on a namespace that does not exist yet | The stub's `delete` never raised | `reindex_all()` — the *first* thing a new setup runs — crashes |
-| `all_hashes()` iterated `list()` as if it yielded id strings | The stub returned what the code expected, not what the SDK returns | Returned `{}`, so reconcile saw all 35 courses as `missing` and re-upserted hourly forever, while `stale` and `orphaned` could never be detected — a no-op that looked like a repair |
+| `all_hashes()` iterated `list()` as if it yielded id strings | The stub returned what the code expected, not what the SDK returns | Returned `{}`, so reconcile saw every course as `missing` and re-upserted hourly forever, while `stale` and `orphaned` could never be detected — a no-op that looked like a repair |
 
 All three are fixed, each with a regression test whose stub now models the *real* shape.
 Verified live afterwards: 35 vectors indexed from the embedding cache for **$0**, the
 20-probe eval identical to Chroma, drift injected and repaired at exactly 1 vector rather
 than 35, and a full agent run at $0.000492.
 
-Chroma remains the local default, so `git clone && make seed && make run` still needs no
+Chroma remains the local default, so `git clone` plus `uv run python -m app.seed` and
+`uv run uvicorn app.main:app --reload --port 8000` still needs no
 signup, and it is what the suite and CI run against — but deployments go to Pinecone, and
 that path is now one someone has actually walked.
 - **APScheduler assumes one process.** The jobs are individually safe to run
@@ -719,7 +776,7 @@ that path is now one someone has actually walked.
 - **The budget gate is checked before a call**, so a single call can overshoot the cap;
   cost is only knowable afterwards. The guarantee is that spending *stops* once the
   limit is crossed, not that it never crosses it.
-- **Retrieval is tuned on 20 probes against 35 courses.** recall@1 0.95, recall@5 1.00,
+- **Retrieval is tuned on 20 probes against the catalogue.** recall@1 0.95, recall@5 1.00,
   MRR 0.975 — but a 35-item catalogue is small enough that these numbers would need
   re-establishing at real scale, where several near-identical deep-learning courses
   would be competing rather than one.
@@ -735,15 +792,15 @@ that path is now one someone has actually walked.
 
 ## Documentation
 
-This README covers the what-and-why with evidence inline. Four docs go one level
+This README covers the what-and-why with evidence inline. Five docs go one level
 deeper, written to stay in sync with it rather than duplicate it — they link back here
 for exact counts instead of restating them:
 
 | Doc | Covers |
 |---|---|
-| [`docs/architecture.md`](docs/architecture.md) | System components, the request path, and short-term (`AgentState`) vs. long-term (`UserProfile`) context management |
-| [`docs/low-level-design.md`](docs/low-level-design.md) | Module-by-module internals: the accumulator-reducer mechanic, the graph's branch conditions, the decay math, the trigger cascade, Mesh's state machines |
-| [`docs/features.md`](docs/features.md) | One canonical feature inventory — learner-facing, admin-facing, responsible-AI, platform |
+| [`docs/architecture.md`](docs/architecture.md) | System components, the two recommendation engines and why they differ, the request path, and short-term (`AgentState`) vs. long-term (`UserProfile`) context management |
+| [`docs/low-level-design.md`](docs/low-level-design.md) | Module-by-module internals: the accumulator-reducer mechanic, the graph's branch conditions, the decay math, the trigger cascade, Mesh's state machines, the skill vocabulary and the career skill-gap engine |
+| [`docs/features.md`](docs/features.md) | One canonical feature inventory — career layer, learner-facing, admin-facing, responsible-AI, platform |
 | [`docs/evals.md`](docs/evals.md) | DeepEval integration, the custom GEval rubric, prompt versioning, PII scrubbing, red-teaming — full detail behind the "Evals, prompt versioning and red-teaming" section above |
 | [`docs/demo-script.md`](docs/demo-script.md) | A shot-by-shot script for recording a walkthrough video against the real running app |
 
@@ -752,7 +809,7 @@ for exact counts instead of restating them:
 ## Stack
 
 FastAPI · SQLAlchemy 2 · SQLite/Postgres · Alembic · **Mesh API** (all model traffic) ·
-LangChain 1.3 · LangGraph 1.2 · LangSmith · Logfire/OpenTelemetry · Chroma · Pinecone ·
+OpenAI SDK · LangGraph 1.2 · LangSmith · Logfire/OpenTelemetry · Chroma · Pinecone ·
 NeMo Guardrails · DeepEval · APScheduler · Jinja2 · vanilla JS · uv · pytest · ruff · Docker
 
 Code style follows [Andrej Karpathy's engineering philosophy](.claude/skills/karpathy-coding-style/SKILL.md);

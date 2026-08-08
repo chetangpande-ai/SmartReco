@@ -257,6 +257,9 @@ def _cut_weak_hits(hits: list[tuple[int, float]]) -> list[tuple[int, float]]:
     `retrieval_score_ratio` of the best one is model-agnostic: it asks "is this close
     to the best match we found" rather than "does this clear some absolute number I
     tuned for one embedding model".
+
+    Excluded ids must already be gone from `hits` — the floor is relative to the best
+    result we are *allowed to return*, not to the best one the index happened to hold.
     """
     if not hits:
         return []
@@ -345,8 +348,16 @@ def retrieve(
         query_vector = embedder.embed_query(query_text, db=db)
 
     store = get_vector_store()
+    # Excluded before the floor, not after. `_cut_weak_hits` keeps hits within a ratio of
+    # the *best* one, so a strong hit we can never return drags the bar up for everything
+    # we can — and the strongest hit is very often excluded, because `exclude_ids` is the
+    # courses this learner already enrolled in. It goes to zero results when the query is
+    # a course's own text ("because you viewed X"): the course matches itself perfectly,
+    # sets a floor nothing else can clear, and the row comes back empty.
     raw_vector = [
-        (h.product_id, h.score) for h in store.query(query_vector.tolist(), pool_size, flt)
+        (h.product_id, h.score)
+        for h in store.query(query_vector.tolist(), pool_size, flt)
+        if h.product_id not in exclude
     ]
     vector_hits = _cut_weak_hits(raw_vector)
     lexical_hits = get_lexical_index(db).search(query_text, pool_size)

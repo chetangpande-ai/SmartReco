@@ -23,21 +23,47 @@ when a number changes.
   │  auth     │       │  triggers   │       │  state      │
   │  admin    │       │  retrieval  │       │  prompts    │
   │  recs     │       │  guardrails │       └──────┬──────┘
-  └───────────┘       │  mesh       │              │
+  │  career   │       │  catalog    │              │
+  │  explore  │──────▶│  advisor    │──────────────┤
+  └───────────┘       │  learning   │              │
+                       │  shelves    │              │
+                       │  mesh       │              │
                        └──────┬──────┘              │
                               │                      │
-                    ┌─────────┴──────────┐          │
-                    ▼                    ▼          ▼
-              ┌───────────┐       ┌────────────┐  ┌────────┐
-              │ Postgres/ │       │  Chroma /   │  │  Mesh  │
-              │  SQLite   │       │  Pinecone   │  │ (LLM)  │
-              └───────────┘       └────────────┘  └────────┘
+              ┌───────────────┼──────────┬───────────┤
+              ▼               ▼          ▼           ▼
+      ┌─────────────┐  ┌───────────┐ ┌──────────┐ ┌────────┐
+      │ taxonomy.py │  │ Postgres/ │ │ Chroma / │ │  Mesh  │
+      │ + data/     │  │  SQLite   │ │ Pinecone │ │ (LLM)  │
+      └─────────────┘  └───────────┘ └──────────┘ └────────┘
 ```
 
 Every arrow into "Mesh" is the same choke point — `app/services/mesh.py`. No other
 module talks to an LLM or embedding API directly. That's what makes the budget cap,
 circuit breaker and token accounting real system properties instead of per-call
 discipline someone has to remember.
+
+`app/taxonomy.py` is drawn as a store because that is what it is: the skill vocabulary,
+loaded once at import from `app/data/taxonomy.json`. It has no table and no migration,
+because it changes with releases rather than with users — a category is not user data.
+
+## Two engines, deliberately different
+
+The platform answers "what should I learn next?" twice, from different evidence, and the
+two are kept apart on purpose.
+
+| | Behavioural (`services/recommender` → `agent/`) | Career (`services/advisor`) |
+|---|---|---|
+| Input | What the learner *did* — tracked events, decayed | What the learner *said* — a stated role and skill list |
+| Reasoning | LangGraph: retrieve → grade → generate → verify | Set difference against a role's requirements, then a walk down a career path |
+| Who picks the courses | Retrieval proposes, an LLM grades and re-ranks, a verifier drops anything ungrounded | Nothing model-driven. Prerequisite order decides |
+| What the LLM does | Writes the copy **and** ranks | Writes the copy only |
+| Without an LLM | Deterministic ranker + template copy | Byte-identical plan, template copy |
+
+The asymmetry is the design. Behaviour is noisy and ambiguous, so a model earns its place
+judging relevance. A career plan is the most consequential thing this platform says to
+anyone, and "which course teaches RAG, and what must you know first" is answerable from
+the skill graph — so a model is never asked to guess at it.
 
 ## Request path
 

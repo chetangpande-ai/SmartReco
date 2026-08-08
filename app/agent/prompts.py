@@ -136,3 +136,141 @@ Your previous response was rejected for these reasons:
 {violations}
 
 Rewrite it. Fix every issue. Keep the same JSON shape and use only the given ids."""
+
+
+# ---- AI Career Advisor -----------------------------------------------------------
+#
+# Unlike the two prompts above, this one does not choose anything. The skills, the gaps,
+# the courses and their order are all computed in `services/advisor.py` before the model
+# is called, and are handed over as settled facts. The model writes the paragraph around
+# them. That division is deliberate: a career plan is the most consequential thing this
+# platform says to anyone, and "which course next" is answerable from the skill graph, so
+# there is no reason to let a language model guess at it.
+
+ADVISOR_PROMPT_VERSION = "v1"
+
+ADVISOR_SYSTEM = """You write the opening of a personalised career transition plan for a learner on an online learning platform.
+
+You are given a learner's background and a plan that has ALREADY been worked out: the
+skills they hold, the gaps to their target role, and the exact courses that close them
+in order. Your job is the framing, not the plan.
+
+Write for someone who is mid-career and slightly nervous about starting over. Two things
+matter more than anything else:
+
+1. Name what genuinely transfers. An experienced tester moving into AI engineering is
+   not a beginner — they bring systems thinking, failure hunting and evidence
+   discipline. Say which of their actual listed skills carry over and why.
+2. Be honest about the gap. Do not soften it into nothing, and do not dramatise it.
+
+Hard rules:
+- Use ONLY the skills, courses and facts given to you. Never name a course that is not
+  in the list. Never claim a skill they did not state.
+- No outcome promises. Nothing about salaries, job guarantees, timelines to being hired,
+  or how in-demand a role is. You cannot know any of it.
+- No hype. "You'll be unstoppable" is worse than saying nothing.
+- Two to four sentences of narrative. This sits above the plan, it is not the plan.
+
+Return JSON only:
+{
+  "headline": "short, specific, names both ends of the move",
+  "narrative": "2-4 sentences"
+}"""
+
+
+FIT_PROMPT_VERSION = "v1"
+
+FIT_SYSTEM = """You answer one question for a learner looking at a course page: is this course right for them, right now?
+
+You are given the course's real facts and what the learner has told us about their
+background and target role. The prerequisite check has already been done for you — you
+are told exactly which prerequisites they hold and which they do not.
+
+Be willing to say no. A recommendation engine that always says yes is worth nothing, and
+the learner is about to spend real hours. If they are missing a prerequisite, say so and
+name what to do first. If the course is below their level, say that too.
+
+Hard rules:
+- Only use the facts given. Never invent a module, a duration, or a prerequisite.
+- No outcome promises: nothing about salaries, jobs, or how long until they are hired.
+- Three sentences at most. They asked a question, not for an essay.
+
+Return JSON only:
+{
+  "verdict": one of "good fit" | "not yet" | "too basic",
+  "answer": "at most three sentences, addressed to them as 'you'"
+}"""
+
+
+def fit_user_prompt(course, profile, held: set[str], missing: list[str]) -> str:
+    from app import taxonomy
+
+    lines = [
+        "COURSE",
+        f"- {course.title} by {course.instructor or course.brand}",
+        f"- level: {course.tier} · {course.duration_hours} hours · {course.format}",
+        f"- teaches: {', '.join(taxonomy.skill_name(s) for s in course.teaches) or 'not listed'}",
+        f"- assumes you know: {', '.join(taxonomy.skill_name(s) for s in course.requires) or 'nothing'}",
+        f"- {course.description[:400]}",
+        "",
+        "LEARNER",
+    ]
+    if profile is None:
+        lines.append("- has not told us anything about themselves yet")
+    else:
+        target = taxonomy.role(profile.target_role)
+        lines += [
+            f"- current role: {profile.current_role or 'not stated'}",
+            f"- experience: {profile.years_experience} years",
+            f"- target role: {target.name if target else 'not stated'}",
+        ]
+        known = [taxonomy.skill_name(s) for s in list(held)[:14]]
+        lines.append(f"- skills they hold: {', '.join(known) or 'none recorded'}")
+
+    lines += [
+        "",
+        "PREREQUISITE CHECK (already computed, treat as fact)",
+        f"- missing prerequisites: {', '.join(taxonomy.skill_name(s) for s in missing) or 'none'}",
+        "",
+        "Answer: is this course right for them right now?",
+    ]
+    return "\n".join(lines)
+
+
+def advisor_user_prompt(profile, analysis) -> str:
+    """Render the computed analysis as facts for the model to write around."""
+    from app import taxonomy
+
+    role = analysis.role.name if analysis.role else "?"
+    lines = [
+        "LEARNER",
+        f"- current role: {profile.current_role or 'not stated'}",
+        f"- experience: {profile.years_experience} years",
+        f"- target role: {role}",
+    ]
+    if profile.interests:
+        lines.append(f"- stated interests: {profile.interests}")
+    if profile.weekly_hours:
+        lines.append(f"- available: about {profile.weekly_hours} hours a week")
+
+    lines += ["", "SKILLS THEY ALREADY HAVE THAT THE ROLE REQUIRES"]
+    lines += [f"- {taxonomy.skill_name(s)}" for s in analysis.have] or ["- none yet"]
+
+    if analysis.transferable:
+        lines += ["", "OTHER SKILLS THEY LISTED (not required, but they have them)"]
+        lines += [f"- {taxonomy.skill_name(s)}" for s in analysis.transferable[:8]]
+
+    lines += ["", f"GAPS TO {role.upper()}, IN THE ORDER THE PLAN CLOSES THEM"]
+    for gap in analysis.gaps:
+        course = f" — via {gap.course.title}" if gap.course else " — no course yet"
+        lines.append(f"- {gap.name}{course}")
+
+    if analysis.path:
+        lines += ["", f"PATH: {analysis.path.name}"]
+    lines += [
+        "",
+        f"READINESS: {analysis.readiness * 100:.0f}% of the role's listed skills already held.",
+        "",
+        "Write the headline and narrative that sit above this plan.",
+    ]
+    return "\n".join(lines)

@@ -33,6 +33,12 @@ jobs:
       - name: Lint
         run: uv run ruff check app tests scripts
 
+      # The career layer is a graph, and a typo in a skill slug does not raise — it
+      # produces a roadmap step with no course behind it. Offline and free, so it runs
+      # before the suite rather than as part of it.
+      - name: Catalogue agrees with the taxonomy
+        run: uv run python -m scripts.check_catalogue
+
       # The suite runs with LLM_ENABLED=false: the deterministic embedder and
       # template copy writer make it hermetic, so CI needs no MESH_API_KEY and
       # spends nothing. The Mesh client itself is covered against a stub.
@@ -50,7 +56,8 @@ jobs:
           tables = set(inspect(create_engine('sqlite+pysqlite:///./data/ci.db')).get_table_names())
           expected = {'users','products','events','user_profiles','recommendations',
                       'recommendation_items','agent_runs','vector_outbox','notifications',
-                      'embedding_cache'}
+                      'embedding_cache','course_skills','enrollments','career_profiles',
+                      'career_plans'}
           assert expected <= tables, f'missing: {expected - tables}'
           print(f'{len(expected)} tables created')"
 

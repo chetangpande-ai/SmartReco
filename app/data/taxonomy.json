@@ -1,0 +1,2060 @@
+{
+  "schema_version": "1.0.0",
+  "platform_model": {
+    "name": "Career Learning Marketplace",
+    "inspiration": [
+      "Udemy",
+      "Simplilearn",
+      "upGrad"
+    ],
+    "architecture": "Category → Subcategory → Topic → Skill → Course → Learning Path → Career Role",
+    "principle": "Learn → Practice → Build → Evaluate → Certify → Get Career Ready"
+  },
+  "top_navigation": {
+    "Explore": [
+      "Categories",
+      "Career Paths",
+      "Certifications",
+      "Professional Programs",
+      "Bootcamps",
+      "Free Courses"
+    ],
+    "Practice": [
+      "Coding Practice",
+      "Quizzes",
+      "Assessments",
+      "Labs",
+      "Projects",
+      "Challenges"
+    ],
+    "Career": [
+      "Career Paths",
+      "Interview Preparation",
+      "Resume & LinkedIn",
+      "Mock Interviews",
+      "Career Switch"
+    ],
+    "Business": [
+      "Corporate Training",
+      "Team Upskilling",
+      "AI Transformation",
+      "Enterprise Programs"
+    ]
+  },
+  "categories": [
+    {
+      "id": "ai-ml",
+      "name": "AI & Machine Learning",
+      "subcategories": [
+        {
+          "id": "ai-fundamentals",
+          "name": "AI Fundamentals",
+          "topics": [
+            "Introduction to AI",
+            "AI Concepts",
+            "AI Mathematics",
+            "Probability",
+            "Statistics",
+            "Machine Learning Fundamentals",
+            "Deep Learning Fundamentals",
+            "Responsible AI"
+          ]
+        },
+        {
+          "id": "machine-learning",
+          "name": "Machine Learning",
+          "topics": [
+            "Supervised Learning",
+            "Unsupervised Learning",
+            "Regression",
+            "Classification",
+            "Clustering",
+            "Feature Engineering",
+            "Model Selection",
+            "Model Evaluation",
+            "Ensemble Methods"
+          ]
+        },
+        {
+          "id": "deep-learning",
+          "name": "Deep Learning",
+          "topics": [
+            "Neural Networks",
+            "CNNs",
+            "RNNs",
+            "LSTM",
+            "Transformers",
+            "Transfer Learning",
+            "Model Optimization",
+            "PyTorch",
+            "TensorFlow"
+          ]
+        },
+        {
+          "id": "nlp",
+          "name": "Natural Language Processing",
+          "topics": [
+            "Text Processing",
+            "Tokenization",
+            "TF-IDF",
+            "Word Embeddings",
+            "Word2Vec",
+            "BERT",
+            "Text Classification",
+            "Named Entity Recognition",
+            "Semantic Search"
+          ]
+        },
+        {
+          "id": "generative-ai",
+          "name": "Generative AI",
+          "topics": [
+            "GenAI Fundamentals",
+            "LLMs",
+            "Prompt Engineering",
+            "Prompt Optimization",
+            "Embeddings",
+            "Vector Databases",
+            "RAG",
+            "Multimodal AI",
+            "LLM Fine-tuning",
+            "AI Evaluation",
+            "AI Safety"
+          ]
+        },
+        {
+          "id": "agentic-ai",
+          "name": "Agentic AI",
+          "topics": [
+            "AI Agents",
+            "Agent Architecture",
+            "Tool Calling",
+            "Agent Memory",
+            "Planning",
+            "Multi-Agent Systems",
+            "Agent Workflows",
+            "Human-in-the-Loop",
+            "MCP",
+            "Agent Evaluation",
+            "Agentic RAG"
+          ]
+        },
+        {
+          "id": "ai-development",
+          "name": "AI Application Development",
+          "topics": [
+            "Python for AI",
+            "OpenAI APIs",
+            "Azure OpenAI",
+            "Gemini APIs",
+            "Hugging Face",
+            "LangChain",
+            "LangGraph",
+            "LlamaIndex",
+            "Ollama",
+            "AI APIs",
+            "AI Application Architecture"
+          ]
+        },
+        {
+          "id": "computer-vision",
+          "name": "Computer Vision",
+          "topics": [
+            "Image Processing",
+            "Object Detection",
+            "Image Classification",
+            "OCR",
+            "Document AI",
+            "Vision Transformers",
+            "Multimodal Vision"
+          ]
+        },
+        {
+          "id": "ai-production",
+          "name": "Production AI & MLOps",
+          "topics": [
+            "ML Pipelines",
+            "Model Deployment",
+            "Model Monitoring",
+            "MLOps",
+            "LLMOps",
+            "AI Observability",
+            "AI Security",
+            "AI Governance",
+            "AI Evals"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "data",
+      "name": "Data Science & Analytics",
+      "subcategories": [
+        {
+          "id": "data-fundamentals",
+          "name": "Data Fundamentals",
+          "topics": [
+            "Data Literacy",
+            "Excel",
+            "Advanced Excel",
+            "SQL",
+            "Statistics",
+            "Data Cleaning",
+            "Data Preparation"
+          ]
+        },
+        {
+          "id": "data-science",
+          "name": "Data Science",
+          "topics": [
+            "Python for Data Science",
+            "EDA",
+            "Statistics",
+            "Machine Learning",
+            "Predictive Analytics",
+            "Feature Engineering",
+            "Model Evaluation"
+          ]
+        },
+        {
+          "id": "data-analytics",
+          "name": "Data Analytics",
+          "topics": [
+            "Business Analytics",
+            "Product Analytics",
+            "Marketing Analytics",
+            "Financial Analytics",
+            "Customer Analytics",
+            "Operational Analytics"
+          ]
+        },
+        {
+          "id": "bi",
+          "name": "Business Intelligence",
+          "topics": [
+            "Power BI",
+            "Tableau",
+            "Looker",
+            "Dashboards",
+            "Data Storytelling",
+            "BI Reporting"
+          ]
+        },
+        {
+          "id": "data-engineering",
+          "name": "Data Engineering",
+          "topics": [
+            "ETL",
+            "ELT",
+            "Data Pipelines",
+            "Data Warehousing",
+            "Data Lakes",
+            "Apache Spark",
+            "Airflow",
+            "Databricks",
+            "Snowflake",
+            "Kafka"
+          ]
+        },
+        {
+          "id": "big-data",
+          "name": "Big Data",
+          "topics": [
+            "Hadoop",
+            "Spark",
+            "Kafka",
+            "Distributed Computing",
+            "Stream Processing",
+            "Lakehouse Architecture"
+          ]
+        },
+        {
+          "id": "advanced-analytics",
+          "name": "Advanced Analytics",
+          "topics": [
+            "Time Series",
+            "Recommendation Systems",
+            "A/B Testing",
+            "Forecasting",
+            "Optimization",
+            "Causal Inference"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "software",
+      "name": "Software Development",
+      "subcategories": [
+        {
+          "id": "programming",
+          "name": "Programming Languages",
+          "topics": [
+            "Python",
+            "Java",
+            "JavaScript",
+            "TypeScript",
+            "C",
+            "C++",
+            "C#",
+            "Go",
+            "Rust",
+            "Kotlin",
+            "Swift",
+            "PHP"
+          ]
+        },
+        {
+          "id": "web",
+          "name": "Web Development",
+          "topics": [
+            "HTML",
+            "CSS",
+            "JavaScript",
+            "React",
+            "Angular",
+            "Vue",
+            "Next.js",
+            "Node.js",
+            "Full Stack Development"
+          ]
+        },
+        {
+          "id": "backend",
+          "name": "Backend Development",
+          "topics": [
+            "Spring Boot",
+            "FastAPI",
+            "Django",
+            "Node.js",
+            "REST APIs",
+            "GraphQL",
+            "Microservices",
+            "Authentication",
+            "API Security"
+          ]
+        },
+        {
+          "id": "frontend",
+          "name": "Frontend Development",
+          "topics": [
+            "React",
+            "Angular",
+            "Vue",
+            "TypeScript",
+            "State Management",
+            "Frontend Architecture",
+            "Web Performance"
+          ]
+        },
+        {
+          "id": "mobile",
+          "name": "Mobile Development",
+          "topics": [
+            "Android",
+            "iOS",
+            "Flutter",
+            "React Native",
+            "Mobile Architecture"
+          ]
+        },
+        {
+          "id": "architecture",
+          "name": "Software Architecture",
+          "topics": [
+            "System Design",
+            "HLD",
+            "LLD",
+            "Design Patterns",
+            "Distributed Systems",
+            "Microservices",
+            "Event-Driven Architecture",
+            "API Architecture"
+          ]
+        },
+        {
+          "id": "databases",
+          "name": "Databases",
+          "topics": [
+            "SQL",
+            "PostgreSQL",
+            "MySQL",
+            "MongoDB",
+            "Redis",
+            "Database Design",
+            "Query Optimization",
+            "NoSQL"
+          ]
+        },
+        {
+          "id": "development-tools",
+          "name": "Developer Tools",
+          "topics": [
+            "Git",
+            "GitHub",
+            "GitLab",
+            "VS Code",
+            "CLI",
+            "Package Management",
+            "API Tools"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cloud",
+      "name": "Cloud Computing",
+      "subcategories": [
+        {
+          "id": "cloud-fundamentals",
+          "name": "Cloud Fundamentals",
+          "topics": [
+            "Cloud Concepts",
+            "IaaS",
+            "PaaS",
+            "SaaS",
+            "Networking",
+            "Storage",
+            "Compute",
+            "Cloud Security"
+          ]
+        },
+        {
+          "id": "aws",
+          "name": "Amazon Web Services",
+          "topics": [
+            "AWS Fundamentals",
+            "EC2",
+            "S3",
+            "Lambda",
+            "RDS",
+            "EKS",
+            "IAM",
+            "VPC",
+            "CloudFormation",
+            "Solutions Architecture"
+          ]
+        },
+        {
+          "id": "azure",
+          "name": "Microsoft Azure",
+          "topics": [
+            "Azure Fundamentals",
+            "Azure Compute",
+            "Azure Storage",
+            "Azure Functions",
+            "AKS",
+            "Azure AI",
+            "Azure OpenAI",
+            "Azure DevOps",
+            "Azure Architecture"
+          ]
+        },
+        {
+          "id": "gcp",
+          "name": "Google Cloud",
+          "topics": [
+            "GCP Fundamentals",
+            "Compute Engine",
+            "Cloud Storage",
+            "GKE",
+            "BigQuery",
+            "Vertex AI",
+            "Cloud Functions"
+          ]
+        },
+        {
+          "id": "cloud-architecture",
+          "name": "Cloud Architecture",
+          "topics": [
+            "Cloud Architecture",
+            "Serverless",
+            "High Availability",
+            "Disaster Recovery",
+            "Multi-Cloud",
+            "FinOps",
+            "Cloud Migration"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "devops",
+      "name": "DevOps, SRE & Platform Engineering",
+      "subcategories": [
+        {
+          "id": "devops-fundamentals",
+          "name": "DevOps Fundamentals",
+          "topics": [
+            "DevOps Culture",
+            "CI/CD",
+            "Version Control",
+            "Release Management",
+            "Automation"
+          ]
+        },
+        {
+          "id": "containers",
+          "name": "Containers",
+          "topics": [
+            "Docker",
+            "Container Images",
+            "Docker Compose",
+            "Container Security"
+          ]
+        },
+        {
+          "id": "kubernetes",
+          "name": "Kubernetes",
+          "topics": [
+            "Kubernetes Fundamentals",
+            "Pods",
+            "Deployments",
+            "Services",
+            "Ingress",
+            "Helm",
+            "AKS",
+            "EKS",
+            "GKE"
+          ]
+        },
+        {
+          "id": "cicd",
+          "name": "CI/CD",
+          "topics": [
+            "GitHub Actions",
+            "Jenkins",
+            "GitLab CI",
+            "Azure DevOps",
+            "Pipeline Design",
+            "Release Automation"
+          ]
+        },
+        {
+          "id": "iac",
+          "name": "Infrastructure as Code",
+          "topics": [
+            "Terraform",
+            "Ansible",
+            "CloudFormation",
+            "Infrastructure Automation"
+          ]
+        },
+        {
+          "id": "sre",
+          "name": "SRE & Observability",
+          "topics": [
+            "SRE Fundamentals",
+            "SLI/SLO/SLA",
+            "Prometheus",
+            "Grafana",
+            "Logging",
+            "Tracing",
+            "Incident Management"
+          ]
+        },
+        {
+          "id": "platform-engineering",
+          "name": "Platform Engineering",
+          "topics": [
+            "Internal Developer Platforms",
+            "Developer Experience",
+            "Golden Paths",
+            "Platform Automation"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cybersecurity",
+      "name": "Cybersecurity",
+      "subcategories": [
+        {
+          "id": "security-fundamentals",
+          "name": "Security Fundamentals",
+          "topics": [
+            "Cybersecurity Basics",
+            "Networking Security",
+            "Threats",
+            "Vulnerabilities",
+            "Risk"
+          ]
+        },
+        {
+          "id": "application-security",
+          "name": "Application Security",
+          "topics": [
+            "OWASP",
+            "Secure Coding",
+            "API Security",
+            "SAST",
+            "DAST",
+            "Software Supply Chain Security"
+          ]
+        },
+        {
+          "id": "cloud-security",
+          "name": "Cloud Security",
+          "topics": [
+            "Cloud IAM",
+            "Cloud Network Security",
+            "Container Security",
+            "Cloud Compliance"
+          ]
+        },
+        {
+          "id": "ethical-hacking",
+          "name": "Ethical Hacking",
+          "topics": [
+            "Penetration Testing",
+            "Web Security Testing",
+            "Network Testing",
+            "Vulnerability Assessment"
+          ]
+        },
+        {
+          "id": "soc",
+          "name": "Security Operations",
+          "topics": [
+            "SOC",
+            "SIEM",
+            "Incident Response",
+            "Threat Detection",
+            "Threat Intelligence"
+          ]
+        },
+        {
+          "id": "identity",
+          "name": "Identity & Access Management",
+          "topics": [
+            "IAM",
+            "SSO",
+            "OAuth",
+            "OIDC",
+            "Privileged Access",
+            "Zero Trust"
+          ]
+        },
+        {
+          "id": "ai-security",
+          "name": "AI & LLM Security",
+          "topics": [
+            "LLM Security",
+            "Prompt Injection",
+            "AI Red Teaming",
+            "Model Security",
+            "AI Governance",
+            "AI Privacy"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "testing",
+      "name": "Software Testing & Quality Engineering",
+      "subcategories": [
+        {
+          "id": "testing-fundamentals",
+          "name": "Testing Fundamentals",
+          "topics": [
+            "Software Testing",
+            "STLC",
+            "Test Planning",
+            "Test Design",
+            "Defect Management",
+            "Test Strategy"
+          ]
+        },
+        {
+          "id": "test-automation",
+          "name": "Test Automation",
+          "topics": [
+            "Selenium",
+            "Playwright",
+            "Cypress",
+            "Appium",
+            "Automation Frameworks",
+            "Java Automation",
+            "Python Automation",
+            "TypeScript Automation"
+          ]
+        },
+        {
+          "id": "api-testing",
+          "name": "API Testing",
+          "topics": [
+            "REST API Testing",
+            "Postman",
+            "REST Assured",
+            "API Automation",
+            "Contract Testing"
+          ]
+        },
+        {
+          "id": "performance",
+          "name": "Performance Testing",
+          "topics": [
+            "Load Testing",
+            "Stress Testing",
+            "JMeter",
+            "Performance Engineering",
+            "Observability"
+          ]
+        },
+        {
+          "id": "quality-engineering",
+          "name": "Quality Engineering",
+          "topics": [
+            "QE Strategy",
+            "Shift Left",
+            "CI/CD Testing",
+            "Quality Metrics",
+            "Test Architecture",
+            "Engineering Excellence"
+          ]
+        },
+        {
+          "id": "ai-qe",
+          "name": "AI for Quality Engineering",
+          "topics": [
+            "GenAI for Testing",
+            "AI Test Case Generation",
+            "AI Test Script Generation",
+            "Agentic Testing",
+            "LLM Testing",
+            "RAG Evaluation",
+            "AI Evals",
+            "AI Quality Engineering"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "it-networking",
+      "name": "IT & Networking",
+      "subcategories": [
+        {
+          "id": "it-fundamentals",
+          "name": "IT Fundamentals",
+          "topics": [
+            "Computer Fundamentals",
+            "Operating Systems",
+            "IT Support",
+            "Troubleshooting"
+          ]
+        },
+        {
+          "id": "linux",
+          "name": "Linux",
+          "topics": [
+            "Linux Fundamentals",
+            "Shell Scripting",
+            "System Administration",
+            "Linux Security"
+          ]
+        },
+        {
+          "id": "networking",
+          "name": "Networking",
+          "topics": [
+            "TCP/IP",
+            "DNS",
+            "HTTP",
+            "Routing",
+            "Switching",
+            "Firewalls",
+            "VPN",
+            "Network Security"
+          ]
+        },
+        {
+          "id": "systems",
+          "name": "Systems Administration",
+          "topics": [
+            "Windows Server",
+            "Linux Administration",
+            "Active Directory",
+            "Virtualization",
+            "Backup & Recovery"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "business-management",
+      "name": "Business & Management",
+      "subcategories": [
+        {
+          "id": "management",
+          "name": "Management",
+          "topics": [
+            "Management Fundamentals",
+            "People Management",
+            "Decision Making",
+            "Delegation",
+            "Performance Management"
+          ]
+        },
+        {
+          "id": "leadership",
+          "name": "Leadership",
+          "topics": [
+            "Leadership Fundamentals",
+            "Strategic Leadership",
+            "Executive Leadership",
+            "Coaching",
+            "Change Management"
+          ]
+        },
+        {
+          "id": "strategy",
+          "name": "Business Strategy",
+          "topics": [
+            "Strategic Thinking",
+            "Business Models",
+            "Competitive Strategy",
+            "Innovation",
+            "Digital Transformation"
+          ]
+        },
+        {
+          "id": "operations",
+          "name": "Operations",
+          "topics": [
+            "Operations Management",
+            "Process Improvement",
+            "Lean",
+            "Six Sigma",
+            "Business Process Management"
+          ]
+        },
+        {
+          "id": "executive-ai",
+          "name": "AI for Business Leaders",
+          "topics": [
+            "AI Strategy",
+            "GenAI Strategy",
+            "AI Transformation",
+            "AI Governance",
+            "AI ROI",
+            "AI Adoption"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "project-management",
+      "name": "Project Management",
+      "subcategories": [
+        {
+          "id": "pm-fundamentals",
+          "name": "Project Management Fundamentals",
+          "topics": [
+            "Project Planning",
+            "Scheduling",
+            "Budgeting",
+            "Risk",
+            "Stakeholders",
+            "Project Governance"
+          ]
+        },
+        {
+          "id": "agile",
+          "name": "Agile & Scrum",
+          "topics": [
+            "Agile Fundamentals",
+            "Scrum",
+            "Kanban",
+            "SAFe",
+            "Agile Planning",
+            "Agile Metrics"
+          ]
+        },
+        {
+          "id": "tools",
+          "name": "Project Management Tools",
+          "topics": [
+            "Jira",
+            "Confluence",
+            "MS Project",
+            "Azure Boards"
+          ]
+        },
+        {
+          "id": "certifications",
+          "name": "PM Certifications",
+          "topics": [
+            "PMP",
+            "CAPM",
+            "CSM",
+            "SAFe"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "product-management",
+      "name": "Product Management",
+      "subcategories": [
+        {
+          "id": "product-fundamentals",
+          "name": "Product Management Fundamentals",
+          "topics": [
+            "Product Lifecycle",
+            "Product Strategy",
+            "Product Discovery",
+            "Roadmaps"
+          ]
+        },
+        {
+          "id": "product-discovery",
+          "name": "Product Discovery",
+          "topics": [
+            "User Research",
+            "Customer Interviews",
+            "Problem Discovery",
+            "Design Thinking"
+          ]
+        },
+        {
+          "id": "product-analytics",
+          "name": "Product Analytics",
+          "topics": [
+            "Product Metrics",
+            "Funnels",
+            "Retention",
+            "Experimentation",
+            "A/B Testing"
+          ]
+        },
+        {
+          "id": "technical-product",
+          "name": "Technical Product Management",
+          "topics": [
+            "APIs",
+            "Architecture Basics",
+            "Technical Roadmaps",
+            "Platform Products"
+          ]
+        },
+        {
+          "id": "ai-product",
+          "name": "AI Product Management",
+          "topics": [
+            "AI Product Strategy",
+            "LLM Products",
+            "AI UX",
+            "AI Evaluation",
+            "AI Product Metrics"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "business-analysis",
+      "name": "Business Analysis",
+      "subcategories": [
+        {
+          "id": "ba-fundamentals",
+          "name": "Business Analysis Fundamentals",
+          "topics": [
+            "Requirements",
+            "Stakeholders",
+            "Business Cases",
+            "Process Analysis"
+          ]
+        },
+        {
+          "id": "requirements",
+          "name": "Requirements Engineering",
+          "topics": [
+            "BRD",
+            "FRD",
+            "User Stories",
+            "Acceptance Criteria",
+            "Requirements Traceability"
+          ]
+        },
+        {
+          "id": "process",
+          "name": "Process Management",
+          "topics": [
+            "Process Mapping",
+            "BPMN",
+            "Workflow Analysis",
+            "Process Optimization"
+          ]
+        },
+        {
+          "id": "agile-ba",
+          "name": "Agile Business Analysis",
+          "topics": [
+            "Agile Requirements",
+            "Backlog Management",
+            "Story Mapping",
+            "Product Backlog"
+          ]
+        },
+        {
+          "id": "ai-ba",
+          "name": "AI for Business Analysts",
+          "topics": [
+            "GenAI for BA",
+            "AI-Assisted Requirements",
+            "AI Process Analysis",
+            "AI Documentation"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "digital-marketing",
+      "name": "Digital Marketing",
+      "subcategories": [
+        {
+          "id": "marketing-fundamentals",
+          "name": "Marketing Fundamentals",
+          "topics": [
+            "Marketing Strategy",
+            "Customer Segmentation",
+            "Branding",
+            "Marketing Planning"
+          ]
+        },
+        {
+          "id": "seo",
+          "name": "SEO",
+          "topics": [
+            "SEO Fundamentals",
+            "Keyword Research",
+            "Technical SEO",
+            "Content SEO",
+            "Analytics"
+          ]
+        },
+        {
+          "id": "performance",
+          "name": "Performance Marketing",
+          "topics": [
+            "Google Ads",
+            "Paid Social",
+            "Campaign Optimization",
+            "Conversion Optimization"
+          ]
+        },
+        {
+          "id": "social",
+          "name": "Social Media Marketing",
+          "topics": [
+            "Content Strategy",
+            "Social Media",
+            "Influencer Marketing",
+            "Community Building"
+          ]
+        },
+        {
+          "id": "content",
+          "name": "Content Marketing",
+          "topics": [
+            "Content Strategy",
+            "Copywriting",
+            "Email Marketing",
+            "Content Distribution"
+          ]
+        },
+        {
+          "id": "ai-marketing",
+          "name": "AI for Marketing",
+          "topics": [
+            "GenAI Content",
+            "AI Marketing Automation",
+            "AI Personalization",
+            "AI Analytics"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "finance",
+      "name": "Finance & Accounting",
+      "subcategories": [
+        {
+          "id": "finance-fundamentals",
+          "name": "Finance Fundamentals",
+          "topics": [
+            "Financial Literacy",
+            "Accounting Basics",
+            "Financial Statements",
+            "Corporate Finance"
+          ]
+        },
+        {
+          "id": "financial-analysis",
+          "name": "Financial Analysis",
+          "topics": [
+            "Ratio Analysis",
+            "Financial Modeling",
+            "Valuation",
+            "Forecasting"
+          ]
+        },
+        {
+          "id": "investment",
+          "name": "Investment & Markets",
+          "topics": [
+            "Investment Fundamentals",
+            "Equity Markets",
+            "Fixed Income",
+            "Portfolio Basics",
+            "Risk"
+          ]
+        },
+        {
+          "id": "fintech",
+          "name": "FinTech",
+          "topics": [
+            "Digital Banking",
+            "Payments",
+            "Capital Markets Technology",
+            "FinTech Innovation",
+            "AI in Finance"
+          ]
+        },
+        {
+          "id": "excel-finance",
+          "name": "Excel for Finance",
+          "topics": [
+            "Financial Models",
+            "Forecasting",
+            "Dashboards",
+            "Advanced Excel"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sales",
+      "name": "Sales & Business Development",
+      "subcategories": [
+        {
+          "id": "sales-fundamentals",
+          "name": "Sales Fundamentals",
+          "topics": [
+            "Sales Process",
+            "Prospecting",
+            "Lead Qualification",
+            "Pipeline Management"
+          ]
+        },
+        {
+          "id": "enterprise-sales",
+          "name": "Enterprise Sales",
+          "topics": [
+            "B2B Sales",
+            "Consultative Selling",
+            "Enterprise Accounts",
+            "Solution Selling"
+          ]
+        },
+        {
+          "id": "crm",
+          "name": "CRM & Sales Technology",
+          "topics": [
+            "Salesforce",
+            "HubSpot",
+            "CRM Analytics",
+            "Sales Automation"
+          ]
+        },
+        {
+          "id": "sales-leadership",
+          "name": "Sales Leadership",
+          "topics": [
+            "Sales Management",
+            "Forecasting",
+            "Sales Metrics",
+            "Coaching"
+          ]
+        },
+        {
+          "id": "ai-sales",
+          "name": "AI for Sales",
+          "topics": [
+            "AI Prospecting",
+            "Sales Automation",
+            "AI Personalization",
+            "Sales Intelligence"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hr",
+      "name": "Human Resources",
+      "subcategories": [
+        {
+          "id": "hr-fundamentals",
+          "name": "HR Fundamentals",
+          "topics": [
+            "HR Management",
+            "Recruitment",
+            "Onboarding",
+            "Performance Management"
+          ]
+        },
+        {
+          "id": "talent",
+          "name": "Talent Management",
+          "topics": [
+            "Talent Strategy",
+            "Learning & Development",
+            "Succession Planning",
+            "Employee Engagement"
+          ]
+        },
+        {
+          "id": "people-analytics",
+          "name": "People Analytics",
+          "topics": [
+            "HR Analytics",
+            "Workforce Analytics",
+            "Employee Metrics"
+          ]
+        },
+        {
+          "id": "ai-hr",
+          "name": "AI for HR",
+          "topics": [
+            "AI Recruitment",
+            "GenAI for HR",
+            "HR Automation",
+            "AI Workforce Strategy"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ui-ux",
+      "name": "UI/UX & Design",
+      "subcategories": [
+        {
+          "id": "ui",
+          "name": "UI Design",
+          "topics": [
+            "UI Fundamentals",
+            "Visual Design",
+            "Design Systems",
+            "Typography",
+            "Color"
+          ]
+        },
+        {
+          "id": "ux",
+          "name": "UX Design",
+          "topics": [
+            "UX Fundamentals",
+            "User Research",
+            "Information Architecture",
+            "Interaction Design"
+          ]
+        },
+        {
+          "id": "tools",
+          "name": "Design Tools",
+          "topics": [
+            "Figma",
+            "Adobe XD",
+            "Prototyping",
+            "Wireframing"
+          ]
+        },
+        {
+          "id": "product-design",
+          "name": "Product Design",
+          "topics": [
+            "Design Thinking",
+            "Product UX",
+            "Design Systems",
+            "Usability Testing"
+          ]
+        },
+        {
+          "id": "ai-design",
+          "name": "AI for Designers",
+          "topics": [
+            "AI Design Tools",
+            "Generative Design",
+            "AI UX",
+            "AI Prototyping"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "personal-development",
+      "name": "Personal Development",
+      "subcategories": [
+        {
+          "id": "communication",
+          "name": "Communication",
+          "topics": [
+            "Business Communication",
+            "Email Writing",
+            "Public Speaking",
+            "Presentation Skills",
+            "Storytelling"
+          ]
+        },
+        {
+          "id": "workplace",
+          "name": "Workplace Skills",
+          "topics": [
+            "Time Management",
+            "Critical Thinking",
+            "Problem Solving",
+            "Collaboration",
+            "Negotiation",
+            "Emotional Intelligence"
+          ]
+        },
+        {
+          "id": "career",
+          "name": "Career Development",
+          "topics": [
+            "Career Planning",
+            "Personal Branding",
+            "Networking",
+            "Career Switching",
+            "Salary Negotiation"
+          ]
+        },
+        {
+          "id": "productivity",
+          "name": "Productivity",
+          "topics": [
+            "Productivity Systems",
+            "Focus",
+            "Goal Setting",
+            "Work Planning"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "office-productivity",
+      "name": "Office Productivity",
+      "subcategories": [
+        {
+          "id": "microsoft",
+          "name": "Microsoft Office",
+          "topics": [
+            "Excel",
+            "Advanced Excel",
+            "PowerPoint",
+            "Word",
+            "Outlook",
+            "Microsoft 365"
+          ]
+        },
+        {
+          "id": "google",
+          "name": "Google Workspace",
+          "topics": [
+            "Google Sheets",
+            "Google Docs",
+            "Google Slides",
+            "Google Workspace"
+          ]
+        },
+        {
+          "id": "collaboration",
+          "name": "Collaboration Tools",
+          "topics": [
+            "Slack",
+            "Teams",
+            "Notion",
+            "Confluence",
+            "Miro"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "engineering-technology",
+      "name": "Engineering & Technology",
+      "subcategories": [
+        {
+          "id": "electronics",
+          "name": "Electronics",
+          "topics": [
+            "Electronics Fundamentals",
+            "Digital Electronics",
+            "Embedded Systems",
+            "Microcontrollers"
+          ]
+        },
+        {
+          "id": "iot",
+          "name": "IoT",
+          "topics": [
+            "IoT Fundamentals",
+            "Sensors",
+            "Edge Computing",
+            "IoT Security"
+          ]
+        },
+        {
+          "id": "robotics",
+          "name": "Robotics",
+          "topics": [
+            "Robotics Fundamentals",
+            "ROS",
+            "Automation",
+            "Computer Vision for Robotics"
+          ]
+        },
+        {
+          "id": "emerging",
+          "name": "Emerging Technology",
+          "topics": [
+            "Quantum Computing",
+            "AR/VR",
+            "Blockchain",
+            "Web3",
+            "Digital Twins",
+            "Edge AI"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "industry-professional",
+      "name": "Industry & Professional Skills",
+      "subcategories": [
+        {
+          "id": "banking",
+          "name": "Banking & Financial Services",
+          "topics": [
+            "Banking Fundamentals",
+            "Payments",
+            "Capital Markets",
+            "Risk",
+            "Compliance",
+            "Digital Banking",
+            "AI in Banking"
+          ]
+        },
+        {
+          "id": "healthcare",
+          "name": "Healthcare",
+          "topics": [
+            "Healthcare Technology",
+            "HealthTech",
+            "Healthcare Analytics",
+            "AI in Healthcare"
+          ]
+        },
+        {
+          "id": "retail",
+          "name": "Retail & E-commerce",
+          "topics": [
+            "E-commerce",
+            "Retail Analytics",
+            "Recommendation Systems",
+            "Customer Analytics",
+            "Retail AI"
+          ]
+        },
+        {
+          "id": "manufacturing",
+          "name": "Manufacturing",
+          "topics": [
+            "Industry 4.0",
+            "Smart Manufacturing",
+            "Supply Chain",
+            "Industrial IoT",
+            "Manufacturing AI"
+          ]
+        },
+        {
+          "id": "insurance",
+          "name": "Insurance",
+          "topics": [
+            "Insurance Fundamentals",
+            "InsurTech",
+            "Risk Analytics",
+            "AI in Insurance"
+          ]
+        }
+      ]
+    }
+  ],
+  "career_roles": [
+    {
+      "id": "ai-engineer",
+      "name": "AI Engineer",
+      "skills": [
+        "Python",
+        "Machine Learning",
+        "LLMs",
+        "RAG",
+        "AI Agents",
+        "LangChain",
+        "LangGraph",
+        "AI Evals",
+        "Cloud"
+      ]
+    },
+    {
+      "id": "ml-engineer",
+      "name": "Machine Learning Engineer",
+      "skills": [
+        "Python",
+        "ML",
+        "Deep Learning",
+        "MLOps",
+        "Model Deployment",
+        "Cloud"
+      ]
+    },
+    {
+      "id": "ai-architect",
+      "name": "AI Solutions Architect",
+      "skills": [
+        "GenAI",
+        "LLM Architecture",
+        "RAG",
+        "AI Agents",
+        "Cloud",
+        "Security",
+        "Architecture",
+        "Governance"
+      ]
+    },
+    {
+      "id": "data-scientist",
+      "name": "Data Scientist",
+      "skills": [
+        "Python",
+        "SQL",
+        "Statistics",
+        "Machine Learning",
+        "Data Analysis",
+        "Visualization"
+      ]
+    },
+    {
+      "id": "data-engineer",
+      "name": "Data Engineer",
+      "skills": [
+        "Python",
+        "SQL",
+        "ETL",
+        "Spark",
+        "Cloud",
+        "Data Warehousing",
+        "Airflow"
+      ]
+    },
+    {
+      "id": "software-engineer",
+      "name": "Software Engineer",
+      "skills": [
+        "Programming",
+        "DSA",
+        "APIs",
+        "Databases",
+        "Git",
+        "System Design"
+      ]
+    },
+    {
+      "id": "full-stack",
+      "name": "Full Stack Developer",
+      "skills": [
+        "HTML",
+        "CSS",
+        "JavaScript",
+        "React",
+        "Node.js",
+        "Databases",
+        "APIs"
+      ]
+    },
+    {
+      "id": "cloud-architect",
+      "name": "Cloud Architect",
+      "skills": [
+        "AWS/Azure/GCP",
+        "Networking",
+        "Security",
+        "Containers",
+        "Kubernetes",
+        "Architecture"
+      ]
+    },
+    {
+      "id": "devops-engineer",
+      "name": "DevOps Engineer",
+      "skills": [
+        "Linux",
+        "Git",
+        "CI/CD",
+        "Docker",
+        "Kubernetes",
+        "Terraform",
+        "Cloud"
+      ]
+    },
+    {
+      "id": "sre",
+      "name": "Site Reliability Engineer",
+      "skills": [
+        "Linux",
+        "Cloud",
+        "Kubernetes",
+        "Observability",
+        "SRE",
+        "Incident Management"
+      ]
+    },
+    {
+      "id": "cybersecurity-engineer",
+      "name": "Cybersecurity Engineer",
+      "skills": [
+        "Networking",
+        "Security",
+        "Cloud Security",
+        "IAM",
+        "Threat Detection"
+      ]
+    },
+    {
+      "id": "qa-engineer",
+      "name": "QA Engineer",
+      "skills": [
+        "Testing",
+        "Automation",
+        "Selenium/Playwright",
+        "API Testing",
+        "CI/CD"
+      ]
+    },
+    {
+      "id": "quality-engineer",
+      "name": "Quality Engineer",
+      "skills": [
+        "Automation",
+        "Test Architecture",
+        "CI/CD",
+        "Quality Engineering",
+        "AI Testing"
+      ]
+    },
+    {
+      "id": "product-manager",
+      "name": "Product Manager",
+      "skills": [
+        "Product Strategy",
+        "Discovery",
+        "Roadmaps",
+        "Analytics",
+        "Stakeholder Management"
+      ]
+    },
+    {
+      "id": "technical-product-manager",
+      "name": "Technical Product Manager",
+      "skills": [
+        "Product",
+        "APIs",
+        "Architecture",
+        "Technical Strategy",
+        "Analytics"
+      ]
+    },
+    {
+      "id": "business-analyst",
+      "name": "Business Analyst",
+      "skills": [
+        "Requirements",
+        "Process Mapping",
+        "BPMN",
+        "User Stories",
+        "Stakeholder Management"
+      ]
+    },
+    {
+      "id": "project-manager",
+      "name": "Project Manager",
+      "skills": [
+        "Planning",
+        "Agile",
+        "Risk",
+        "Stakeholders",
+        "Leadership"
+      ]
+    },
+    {
+      "id": "data-analyst",
+      "name": "Data Analyst",
+      "skills": [
+        "SQL",
+        "Excel",
+        "Power BI",
+        "Statistics",
+        "Data Visualization"
+      ]
+    },
+    {
+      "id": "digital-marketer",
+      "name": "Digital Marketing Specialist",
+      "skills": [
+        "SEO",
+        "SEM",
+        "Social Media",
+        "Analytics",
+        "Content"
+      ]
+    },
+    {
+      "id": "ux-designer",
+      "name": "UX/UI Designer",
+      "skills": [
+        "UX",
+        "UI",
+        "Figma",
+        "Research",
+        "Prototyping"
+      ]
+    },
+    {
+      "id": "engineering-manager",
+      "name": "Engineering Manager",
+      "skills": [
+        "Leadership",
+        "Architecture",
+        "Delivery",
+        "People Management",
+        "Strategy"
+      ]
+    },
+    {
+      "id": "ai-product-manager",
+      "name": "AI Product Manager",
+      "skills": [
+        "Product Strategy",
+        "GenAI",
+        "LLMs",
+        "AI Evaluation",
+        "AI UX",
+        "Analytics"
+      ]
+    }
+  ],
+  "program_types": [
+    "Self-Paced Course",
+    "Instructor-Led Course",
+    "Live Online Class",
+    "Bootcamp",
+    "Professional Certificate",
+    "Certification Preparation",
+    "Career Program",
+    "Executive Program",
+    "Micro-Course",
+    "Crash Course",
+    "Workshop",
+    "Hands-on Lab",
+    "Project",
+    "Capstone Project",
+    "Hackathon",
+    "Interview Preparation",
+    "Mock Interview",
+    "Assessment",
+    "Free Course"
+  ],
+  "course_levels": [
+    "Beginner",
+    "Intermediate",
+    "Advanced",
+    "Expert"
+  ],
+  "delivery_modes": [
+    "Self-Paced",
+    "Live Online",
+    "Hybrid",
+    "In-Person"
+  ],
+  "course_metadata_schema": {
+    "required": [
+      "course_id",
+      "title",
+      "category_id",
+      "subcategory_id",
+      "level",
+      "language",
+      "delivery_mode",
+      "format",
+      "skills",
+      "duration_hours"
+    ],
+    "recommended": [
+      "description",
+      "learning_objectives",
+      "prerequisites",
+      "instructor",
+      "rating",
+      "review_count",
+      "price",
+      "currency",
+      "certificate",
+      "projects",
+      "labs",
+      "career_roles",
+      "career_paths",
+      "tools",
+      "technologies",
+      "last_updated"
+    ]
+  },
+  "career_paths": [
+    {
+      "id": "ai-engineer",
+      "name": "AI Engineer",
+      "steps": [
+        "Python",
+        "AI Fundamentals",
+        "Machine Learning",
+        "LLMs",
+        "RAG",
+        "AI Agents",
+        "LangChain/LangGraph",
+        "AI Evaluation",
+        "Cloud Deployment",
+        "Projects",
+        "Interview Preparation"
+      ]
+    },
+    {
+      "id": "genai-engineer",
+      "name": "Generative AI Engineer",
+      "steps": [
+        "Python",
+        "LLM Fundamentals",
+        "Prompt Engineering",
+        "Embeddings",
+        "Vector Databases",
+        "RAG",
+        "Fine-tuning",
+        "AI Agents",
+        "LLMOps",
+        "Projects"
+      ]
+    },
+    {
+      "id": "ai-architect",
+      "name": "AI Solutions Architect",
+      "steps": [
+        "AI Fundamentals",
+        "GenAI",
+        "LLM Architecture",
+        "RAG",
+        "Agentic AI",
+        "Cloud",
+        "AI Security",
+        "Enterprise Architecture",
+        "Governance",
+        "Case Studies"
+      ]
+    },
+    {
+      "id": "data-scientist",
+      "name": "Data Scientist",
+      "steps": [
+        "Python",
+        "SQL",
+        "Statistics",
+        "Data Analysis",
+        "Machine Learning",
+        "Deep Learning",
+        "NLP",
+        "Projects",
+        "Interview Preparation"
+      ]
+    },
+    {
+      "id": "data-engineer",
+      "name": "Data Engineer",
+      "steps": [
+        "Python",
+        "SQL",
+        "Databases",
+        "ETL",
+        "Cloud",
+        "Spark",
+        "Databricks",
+        "Data Warehousing",
+        "Airflow",
+        "Projects"
+      ]
+    },
+    {
+      "id": "cloud-architect",
+      "name": "Cloud Architect",
+      "steps": [
+        "Networking",
+        "Linux",
+        "Cloud Fundamentals",
+        "AWS/Azure/GCP",
+        "Security",
+        "Docker",
+        "Kubernetes",
+        "Terraform",
+        "System Design",
+        "Certification"
+      ]
+    },
+    {
+      "id": "devops-engineer",
+      "name": "DevOps Engineer",
+      "steps": [
+        "Linux",
+        "Git",
+        "CI/CD",
+        "Docker",
+        "Kubernetes",
+        "Terraform",
+        "Cloud",
+        "Monitoring",
+        "Projects",
+        "Interview Preparation"
+      ]
+    },
+    {
+      "id": "qa-to-ai",
+      "name": "QA Engineer → AI Engineer",
+      "steps": [
+        "Testing",
+        "Automation",
+        "Python",
+        "API Testing",
+        "GenAI",
+        "LLMs",
+        "RAG",
+        "AI Agents",
+        "AI Testing",
+        "Agentic QE",
+        "Projects"
+      ]
+    },
+    {
+      "id": "software-engineer",
+      "name": "Software Engineer",
+      "steps": [
+        "Programming",
+        "DSA",
+        "Git",
+        "Databases",
+        "APIs",
+        "Backend",
+        "Frontend",
+        "System Design",
+        "Projects",
+        "Interview Preparation"
+      ]
+    },
+    {
+      "id": "product-manager",
+      "name": "Product Manager",
+      "steps": [
+        "Product Fundamentals",
+        "Product Discovery",
+        "Strategy",
+        "Roadmaps",
+        "Analytics",
+        "Agile",
+        "Stakeholder Management",
+        "Product Case Studies",
+        "Interview Preparation"
+      ]
+    }
+  ],
+  "learning_features": [
+    "Video Lessons",
+    "Reading Material",
+    "Quizzes",
+    "Coding Exercises",
+    "Interactive Labs",
+    "Projects",
+    "Capstone Projects",
+    "Assessments",
+    "AI-Powered Assessments",
+    "Certificates",
+    "Skill Badges",
+    "Progress Tracking",
+    "Learning Paths",
+    "Practice Tests",
+    "Mock Interviews",
+    "Resume Builder",
+    "LinkedIn Profile Optimization",
+    "Career Recommendations",
+    "Job Role Mapping",
+    "Community Discussion",
+    "Mentor Support",
+    "Live Classes"
+  ],
+  "filters": {
+    "category": [
+      "Category"
+    ],
+    "level": [
+      "Beginner",
+      "Intermediate",
+      "Advanced",
+      "Expert"
+    ],
+    "format": [
+      "Self-Paced",
+      "Live",
+      "Bootcamp",
+      "Workshop",
+      "Project",
+      "Certification"
+    ],
+    "duration": [
+      "0-2 hours",
+      "2-10 hours",
+      "10-30 hours",
+      "30-60 hours",
+      "60+ hours"
+    ],
+    "price": [
+      "Free",
+      "Paid"
+    ],
+    "language": [
+      "English",
+      "Hindi",
+      "Other"
+    ],
+    "rating": [
+      "4.0+",
+      "4.5+"
+    ],
+    "certificate": [
+      "Certificate Available"
+    ],
+    "career": [
+      "Job Role"
+    ],
+    "skill": [
+      "Skill"
+    ],
+    "technology": [
+      "Technology"
+    ],
+    "provider": [
+      "Platform/Instructor"
+    ]
+  }
+}
