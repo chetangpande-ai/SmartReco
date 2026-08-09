@@ -99,10 +99,10 @@
 <article class="shelf rec" id="rec-block" data-rec-id="{{ rec.id }}" data-shelf>
   <div class="shelf-head">
     <div>
-      <h2 class="shelf-title">Recommended for you</h2>
-      <p class="shelf-sub muted">
-        {{ rec.headline }} · refreshed {{ rec.created_at.strftime('%d %b, %H:%M') }}
-      </p>
+      {# The divider above already says "What to learn next", so a "Recommended for you"
+         heading here was the same sentence twice. The headline is the specific thing. #}
+      <h2 class="shelf-title">{{ rec.headline }}</h2>
+      <p class="shelf-sub muted">Refreshed {{ rec.created_at.strftime('%d %b, %H:%M') }}</p>
     </div>
     <form method="post" action="/me/refresh">
       <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">

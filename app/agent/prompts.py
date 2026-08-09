@@ -16,7 +16,7 @@ persuasive model reaches for "land a six-figure job" — a claim nobody can make
 # per run on AgentRun.prompt_versions so a quality shift can be traced to the prompt that
 # caused it.
 GRADE_PROMPT_VERSION = "v1"
-GENERATE_PROMPT_VERSION = "v1"
+GENERATE_PROMPT_VERSION = "v2"
 
 GRADE_SYSTEM = """You judge whether a set of retrieved courses actually matches what a learner has been studying.
 
@@ -83,7 +83,7 @@ from adjectives.
 Return JSON only:
 {
   "headline": "<= 70 characters, specific to this learner",
-  "narrative": "2-3 sentences. Name what they have been studying, then why these courses follow on.",
+  "narrative": "<= 200 characters, at most 2 sentences. Name what they studied, then why these follow on. Never repeat a course title you already named.",
   "cta": "<= 40 characters, plain, no pressure",
   "picks": [
     {"product_id": <id from CANDIDATES>, "reason": "<= 160 chars, tied to their actual behaviour"}

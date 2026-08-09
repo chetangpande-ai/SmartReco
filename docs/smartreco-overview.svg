@@ -1,0 +1,260 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1680 1300" width="1680" height="1300" font-family="Segoe UI, Inter, system-ui, -apple-system, Helvetica, Arial, sans-serif">
+  <title>SmartReco platform overview</title>
+  <desc>How SmartReco turns learner behaviour and stated career goals into recommended courses: the two user flows, the nine-phase AI agent, the four AI principles, key figures, and the technology stack.</desc>
+
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#8d8da4"/>
+    </marker>
+    <marker id="arwA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#4f46e5"/>
+    </marker>
+  </defs>
+
+  <rect width="1680" height="1300" fill="#ffffff"/>
+
+  <!-- ================= HEADER ================= -->
+  <text x="44" y="58" font-size="40" font-weight="700" fill="#14141c" letter-spacing="-0.5">SmartReco</text>
+  <text x="253" y="58" font-size="19" fill="#66667a">career learning marketplace</text>
+  <text x="44" y="88" font-size="17" fill="#41415a">An AI agent decides what each learner should study next — and shows its evidence for why.</text>
+  <line x1="44" y1="104" x2="1636" y2="104" stroke="#e2e2ec" stroke-width="1"/>
+
+  <!-- ================= 1. USER FLOW ================= -->
+  <text x="44" y="146" font-size="21" font-weight="700" fill="#14141c">1 · How a learner reaches a recommendation</text>
+  <text x="510" y="146" font-size="15" fill="#66667a">Two independent routes into the same catalogue</text>
+
+  <!-- row labels -->
+  <text x="44" y="212" font-size="15" font-weight="700" fill="#4f46e5">Behavioural</text>
+  <text x="44" y="232" font-size="13" fill="#66667a">it watches</text>
+  <text x="44" y="298" font-size="15" font-weight="700" fill="#7c3aed">Stated goal</text>
+  <text x="44" y="318" font-size="13" fill="#66667a">you tell it</text>
+
+  <!-- TRACK A -->
+  <g>
+    <rect x="264" y="186" width="202" height="62" rx="10" fill="#ffffff" stroke="#c9c9dd" stroke-width="1.5"/>
+    <text x="365" y="211" font-size="14.5" font-weight="600" fill="#14141c" text-anchor="middle">Browses, searches,</text>
+    <text x="365" y="229" font-size="14.5" font-weight="600" fill="#14141c" text-anchor="middle">dwells on a course</text>
+
+    <rect x="495" y="186" width="202" height="62" rx="10" fill="#ffffff" stroke="#c9c9dd" stroke-width="1.5"/>
+    <text x="596" y="211" font-size="14.5" font-weight="600" fill="#14141c" text-anchor="middle">13 signal types</text>
+    <text x="596" y="230" font-size="12.5" fill="#66667a" text-anchor="middle">captured in 3 ms</text>
+
+    <rect x="726" y="186" width="202" height="62" rx="10" fill="#ffffff" stroke="#c9c9dd" stroke-width="1.5"/>
+    <text x="827" y="211" font-size="14.5" font-weight="600" fill="#14141c" text-anchor="middle">Interest profile</text>
+    <text x="827" y="230" font-size="12.5" fill="#66667a" text-anchor="middle">48h half-life decay</text>
+
+    <rect x="957" y="186" width="202" height="62" rx="10" fill="#fdf6ec" stroke="#d9a441" stroke-width="1.5"/>
+    <text x="1058" y="211" font-size="14.5" font-weight="600" fill="#14141c" text-anchor="middle">Trigger policy</text>
+    <text x="1058" y="230" font-size="12.5" fill="#8a6118" text-anchor="middle">11 gates — spend or skip</text>
+
+    <rect x="1188" y="186" width="202" height="62" rx="10" fill="#eef0ff" stroke="#4f46e5" stroke-width="1.5"/>
+    <text x="1289" y="211" font-size="14.5" font-weight="600" fill="#14141c" text-anchor="middle">AI agent</text>
+    <text x="1289" y="230" font-size="12.5" fill="#4338ca" text-anchor="middle">retrieve → judge → write</text>
+
+    <rect x="1419" y="186" width="217" height="62" rx="10" fill="#ffffff" stroke="#c9c9dd" stroke-width="1.5"/>
+    <text x="1527" y="211" font-size="14.5" font-weight="600" fill="#14141c" text-anchor="middle">Courses + “why these?”</text>
+    <text x="1527" y="230" font-size="12.5" fill="#66667a" text-anchor="middle">cites only what you did</text>
+
+    <line x1="470" y1="217" x2="487" y2="217" stroke="#8d8da4" stroke-width="1.5" marker-end="url(#arw)"/>
+    <line x1="701" y1="217" x2="718" y2="217" stroke="#8d8da4" stroke-width="1.5" marker-end="url(#arw)"/>
+    <line x1="932" y1="217" x2="949" y2="217" stroke="#8d8da4" stroke-width="1.5" marker-end="url(#arw)"/>
+    <line x1="1163" y1="217" x2="1180" y2="217" stroke="#8d8da4" stroke-width="1.5" marker-end="url(#arw)"/>
+    <line x1="1394" y1="217" x2="1411" y2="217" stroke="#8d8da4" stroke-width="1.5" marker-end="url(#arw)"/>
+  </g>
+
+  <!-- TRACK B -->
+  <g>
+    <rect x="264" y="272" width="319" height="62" rx="10" fill="#ffffff" stroke="#c9c9dd" stroke-width="1.5"/>
+    <text x="423" y="297" font-size="14.5" font-weight="600" fill="#14141c" text-anchor="middle">“I’m a QA engineer, I want to be an AI engineer”</text>
+    <text x="423" y="316" font-size="12.5" fill="#66667a" text-anchor="middle">free text, matched to a 628-skill vocabulary</text>
+
+    <rect x="612" y="272" width="319" height="62" rx="10" fill="#f4f0ff" stroke="#7c3aed" stroke-width="1.5"/>
+    <text x="771" y="297" font-size="14.5" font-weight="600" fill="#14141c" text-anchor="middle">Skill-gap analysis</text>
+    <text x="771" y="316" font-size="12.5" fill="#6021c0" text-anchor="middle">what counts · what’s missing · what order</text>
+
+    <rect x="960" y="272" width="319" height="62" rx="10" fill="#ffffff" stroke="#c9c9dd" stroke-width="1.5"/>
+    <text x="1119" y="297" font-size="14.5" font-weight="600" fill="#14141c" text-anchor="middle">8-stage roadmap</text>
+    <text x="1119" y="316" font-size="12.5" fill="#66667a" text-anchor="middle">each step assumes only what the last one taught</text>
+
+    <rect x="1308" y="272" width="328" height="62" rx="10" fill="#ffffff" stroke="#c9c9dd" stroke-width="1.5"/>
+    <text x="1472" y="297" font-size="14.5" font-weight="600" fill="#14141c" text-anchor="middle">Courses, projects, certification</text>
+    <text x="1472" y="316" font-size="12.5" fill="#66667a" text-anchor="middle">chosen by the skill graph, never by the model</text>
+
+    <line x1="587" y1="303" x2="604" y2="303" stroke="#8d8da4" stroke-width="1.5" marker-end="url(#arw)"/>
+    <line x1="935" y1="303" x2="952" y2="303" stroke="#8d8da4" stroke-width="1.5" marker-end="url(#arw)"/>
+    <line x1="1283" y1="303" x2="1300" y2="303" stroke="#8d8da4" stroke-width="1.5" marker-end="url(#arw)"/>
+  </g>
+
+  <line x1="44" y1="372" x2="1636" y2="372" stroke="#e2e2ec" stroke-width="1"/>
+
+  <!-- ================= 2. AI PHASES ================= -->
+  <text x="44" y="414" font-size="21" font-weight="700" fill="#14141c">2 · The nine phases the agent runs</text>
+  <text x="440" y="414" font-size="15" fill="#66667a">Only two of them spend money on a model</text>
+
+  <rect x="1281" y="396" width="16" height="16" rx="4" fill="#eef0ff" stroke="#4f46e5" stroke-width="1.5"/>
+  <text x="1305" y="409" font-size="13" fill="#41415a">calls a model</text>
+  <rect x="1424" y="396" width="16" height="16" rx="4" fill="#ffffff" stroke="#c9c9dd" stroke-width="1.5"/>
+  <text x="1448" y="409" font-size="13" fill="#41415a">deterministic, free</text>
+
+  <g>
+    <rect x="44" y="452" width="201" height="60" rx="10" fill="#ffffff" stroke="#c9c9dd" stroke-width="1.5"/>
+    <text x="144" y="478" font-size="15" font-weight="700" fill="#14141c" text-anchor="middle">analyze</text>
+    <text x="144" y="497" font-size="12.5" fill="#66667a" text-anchor="middle">behaviour → search query</text>
+
+    <rect x="275" y="452" width="201" height="60" rx="10" fill="#ffffff" stroke="#c9c9dd" stroke-width="1.5"/>
+    <text x="375" y="478" font-size="15" font-weight="700" fill="#14141c" text-anchor="middle">plan</text>
+    <text x="375" y="497" font-size="12.5" fill="#66667a" text-anchor="middle">enough signal, or cold start?</text>
+
+    <rect x="506" y="452" width="201" height="60" rx="10" fill="#ffffff" stroke="#c9c9dd" stroke-width="1.5"/>
+    <text x="606" y="478" font-size="15" font-weight="700" fill="#14141c" text-anchor="middle">retrieve</text>
+    <text x="606" y="497" font-size="12.5" fill="#66667a" text-anchor="middle">meaning + keyword + peers</text>
+
+    <rect x="737" y="452" width="201" height="60" rx="10" fill="#eef0ff" stroke="#4f46e5" stroke-width="1.5"/>
+    <text x="837" y="478" font-size="15" font-weight="700" fill="#14141c" text-anchor="middle">grade</text>
+    <text x="837" y="497" font-size="12.5" fill="#4338ca" text-anchor="middle">judges its own results</text>
+
+    <rect x="968" y="452" width="201" height="60" rx="10" fill="#eef0ff" stroke="#4f46e5" stroke-width="1.5"/>
+    <text x="1068" y="478" font-size="15" font-weight="700" fill="#14141c" text-anchor="middle">generate</text>
+    <text x="1068" y="497" font-size="12.5" fill="#4338ca" text-anchor="middle">writes the recommendation</text>
+
+    <rect x="1199" y="452" width="201" height="60" rx="10" fill="#ffffff" stroke="#c9c9dd" stroke-width="1.5"/>
+    <text x="1299" y="478" font-size="15" font-weight="700" fill="#14141c" text-anchor="middle">verify</text>
+    <text x="1299" y="497" font-size="12.5" fill="#66667a" text-anchor="middle">grounded? honest?</text>
+
+    <rect x="1430" y="452" width="201" height="60" rx="10" fill="#ffffff" stroke="#c9c9dd" stroke-width="1.5"/>
+    <text x="1530" y="478" font-size="15" font-weight="700" fill="#14141c" text-anchor="middle">finalize</text>
+    <text x="1530" y="497" font-size="12.5" fill="#66667a" text-anchor="middle">ship, or fall back honestly</text>
+
+    <line x1="249" y1="482" x2="266" y2="482" stroke="#8d8da4" stroke-width="1.5" marker-end="url(#arw)"/>
+    <line x1="480" y1="482" x2="497" y2="482" stroke="#8d8da4" stroke-width="1.5" marker-end="url(#arw)"/>
+    <line x1="711" y1="482" x2="728" y2="482" stroke="#8d8da4" stroke-width="1.5" marker-end="url(#arw)"/>
+    <line x1="942" y1="482" x2="959" y2="482" stroke="#8d8da4" stroke-width="1.5" marker-end="url(#arw)"/>
+    <line x1="1173" y1="482" x2="1190" y2="482" stroke="#8d8da4" stroke-width="1.5" marker-end="url(#arw)"/>
+    <line x1="1404" y1="482" x2="1421" y2="482" stroke="#8d8da4" stroke-width="1.5" marker-end="url(#arw)"/>
+
+    <!-- refine loop: grade sends its own results back to be searched again -->
+    <path d="M 837 514 L 837 538 L 606 538 L 606 516" fill="none" stroke="#4f46e5" stroke-width="1.5" marker-end="url(#arwA)"/>
+    <text x="722" y="554" font-size="12" font-weight="600" fill="#4f46e5" text-anchor="middle">not good enough — search again, max 2</text>
+
+    <!-- repair loop: verify rejects an ungrounded draft -->
+    <path d="M 1299 514 L 1299 538 L 1120 538 L 1120 516" fill="none" stroke="#4f46e5" stroke-width="1.5" marker-end="url(#arwA)"/>
+    <text x="1210" y="554" font-size="12" font-weight="600" fill="#4f46e5" text-anchor="middle">ungrounded — repair once</text>
+
+    <!-- coldstart bypass: no history yet, so retrieval and grading are skipped entirely -->
+    <rect x="506" y="566" width="201" height="42" rx="9" fill="#ffffff" stroke="#a8a8c0" stroke-width="1.5" stroke-dasharray="5 4"/>
+    <text x="606" y="583" font-size="14" font-weight="700" fill="#14141c" text-anchor="middle">coldstart</text>
+    <text x="606" y="600" font-size="12" fill="#66667a" text-anchor="middle">no history — top rated instead</text>
+    <path d="M 375 514 L 375 587 L 498 587" fill="none" stroke="#8d8da4" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arw)"/>
+    <path d="M 707 587 L 1010 587 L 1010 516" fill="none" stroke="#8d8da4" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arw)"/>
+    <text x="858" y="580" font-size="12" fill="#66667a" text-anchor="middle">skips retrieval and grading</text>
+  </g>
+
+  <line x1="44" y1="628" x2="1636" y2="628" stroke="#e2e2ec" stroke-width="1"/>
+
+  <!-- ================= 3. AI PRINCIPLES ================= -->
+  <text x="44" y="670" font-size="21" font-weight="700" fill="#14141c">3 · The four principles the system is built on</text>
+
+  <g>
+    <rect x="44" y="694" width="378" height="132" rx="12" fill="#fafafd" stroke="#e2e2ec" stroke-width="1.5"/>
+    <rect x="44" y="694" width="4" height="132" rx="2" fill="#4f46e5"/>
+    <text x="70" y="726" font-size="16" font-weight="700" fill="#14141c">The model never picks a course</text>
+    <text x="70" y="754" font-size="13.5" fill="#41415a">A career plan is the most consequential thing</text>
+    <text x="70" y="774" font-size="13.5" fill="#41415a">this platform says to anyone. It is computed</text>
+    <text x="70" y="794" font-size="13.5" fill="#41415a">from the skill graph and handed to the model</text>
+    <text x="70" y="814" font-size="13.5" fill="#41415a">as settled fact. It writes only the prose.</text>
+
+    <rect x="448" y="694" width="378" height="132" rx="12" fill="#fafafd" stroke="#e2e2ec" stroke-width="1.5"/>
+    <rect x="448" y="694" width="4" height="132" rx="2" fill="#4f46e5"/>
+    <text x="474" y="726" font-size="16" font-weight="700" fill="#14141c">Grounded, then checked</text>
+    <text x="474" y="754" font-size="13.5" fill="#41415a">Copy may cite only the real catalogue and the</text>
+    <text x="474" y="774" font-size="13.5" fill="#41415a">learner’s own actions. A course that was never</text>
+    <text x="474" y="794" font-size="13.5" fill="#41415a">offered is dropped; 35 always-on checks block</text>
+    <text x="474" y="814" font-size="13.5" fill="#41415a">job guarantees, fake scarcity, invented prices.</text>
+
+    <rect x="852" y="694" width="378" height="132" rx="12" fill="#fafafd" stroke="#e2e2ec" stroke-width="1.5"/>
+    <rect x="852" y="694" width="4" height="132" rx="2" fill="#4f46e5"/>
+    <text x="878" y="726" font-size="16" font-weight="700" fill="#14141c">Spend only when it changes</text>
+    <text x="878" y="746" font-size="16" font-weight="700" fill="#14141c">the answer</text>
+    <text x="878" y="774" font-size="13.5" fill="#41415a">Eleven gates run cheapest-first before any</text>
+    <text x="878" y="794" font-size="13.5" fill="#41415a">model call, and every skip records its reason.</text>
+    <text x="878" y="814" font-size="13.5" fill="#41415a">Most browsing correctly decides “no”.</text>
+
+    <rect x="1256" y="694" width="380" height="132" rx="12" fill="#fafafd" stroke="#e2e2ec" stroke-width="1.5"/>
+    <rect x="1256" y="694" width="4" height="132" rx="2" fill="#4f46e5"/>
+    <text x="1282" y="726" font-size="16" font-weight="700" fill="#14141c">Measured, not assumed</text>
+    <text x="1282" y="754" font-size="13.5" fill="#41415a">Retrieval swept against paraphrase probes,</text>
+    <text x="1282" y="774" font-size="13.5" fill="#41415a">generation scored by an LLM judge, prompts</text>
+    <text x="1282" y="794" font-size="13.5" fill="#41415a">versioned per run, and the injection attacks</text>
+    <text x="1282" y="814" font-size="13.5" fill="#41415a">rehearsed — 4 of 4 blocked.</text>
+  </g>
+
+  <line x1="44" y1="856" x2="1636" y2="856" stroke="#e2e2ec" stroke-width="1"/>
+
+  <!-- ================= 4. KEY FIGURES ================= -->
+  <text x="44" y="898" font-size="21" font-weight="700" fill="#14141c">4 · What is actually built</text>
+
+  <g>
+    <rect x="44" y="922" width="247" height="118" rx="12" fill="#ffffff" stroke="#e2e2ec" stroke-width="1.5"/>
+    <text x="167" y="972" font-size="34" font-weight="700" fill="#4f46e5" text-anchor="middle">628</text>
+    <text x="167" y="996" font-size="14" font-weight="600" fill="#14141c" text-anchor="middle">skills mapped</text>
+    <text x="167" y="1017" font-size="12.5" fill="#66667a" text-anchor="middle">21 categories · 22 roles</text>
+
+    <rect x="313" y="922" width="247" height="118" rx="12" fill="#ffffff" stroke="#e2e2ec" stroke-width="1.5"/>
+    <text x="436" y="972" font-size="34" font-weight="700" fill="#4f46e5" text-anchor="middle">3 ms</text>
+    <text x="436" y="996" font-size="14" font-weight="600" fill="#14141c" text-anchor="middle">to capture a page</text>
+    <text x="436" y="1017" font-size="12.5" fill="#66667a" text-anchor="middle">less than rendering it</text>
+
+    <rect x="582" y="922" width="247" height="118" rx="12" fill="#ffffff" stroke="#e2e2ec" stroke-width="1.5"/>
+    <text x="705" y="972" font-size="34" font-weight="700" fill="#4f46e5" text-anchor="middle">9 → 2</text>
+    <text x="705" y="996" font-size="14" font-weight="600" fill="#14141c" text-anchor="middle">agent phases</text>
+    <text x="705" y="1017" font-size="12.5" fill="#66667a" text-anchor="middle">only two cost anything</text>
+
+    <rect x="851" y="922" width="247" height="118" rx="12" fill="#ffffff" stroke="#e2e2ec" stroke-width="1.5"/>
+    <text x="974" y="972" font-size="34" font-weight="700" fill="#4f46e5" text-anchor="middle">11</text>
+    <text x="974" y="996" font-size="14" font-weight="600" fill="#14141c" text-anchor="middle">cost gates</text>
+    <text x="974" y="1017" font-size="12.5" fill="#66667a" text-anchor="middle">before a single call</text>
+
+    <rect x="1120" y="922" width="247" height="118" rx="12" fill="#ffffff" stroke="#e2e2ec" stroke-width="1.5"/>
+    <text x="1243" y="972" font-size="34" font-weight="700" fill="#4f46e5" text-anchor="middle">35</text>
+    <text x="1243" y="996" font-size="14" font-weight="600" fill="#14141c" text-anchor="middle">honesty checks</text>
+    <text x="1243" y="1017" font-size="12.5" fill="#66667a" text-anchor="middle">always on, free, offline</text>
+
+    <rect x="1389" y="922" width="247" height="118" rx="12" fill="#ffffff" stroke="#e2e2ec" stroke-width="1.5"/>
+    <text x="1512" y="972" font-size="34" font-weight="700" fill="#4f46e5" text-anchor="middle">426</text>
+    <text x="1512" y="996" font-size="14" font-weight="600" fill="#14141c" text-anchor="middle">tests at 91% cover</text>
+    <text x="1512" y="1017" font-size="12.5" fill="#66667a" text-anchor="middle">runs with no API key</text>
+  </g>
+
+  <line x1="44" y1="1074" x2="1636" y2="1074" stroke="#e2e2ec" stroke-width="1"/>
+
+  <!-- ================= 5. TECH STACK ================= -->
+  <text x="44" y="1116" font-size="21" font-weight="700" fill="#14141c">5 · Technology</text>
+
+  <g font-size="13" fill="#2c2c3f">
+    <text x="44" y="1157" font-size="13.5" font-weight="700" fill="#66667a">Application</text>
+    <rect x="230" y="1140" width="76" height="26" rx="13" fill="#f4f4f8" stroke="#e2e2ec"/><text x="268" y="1157" text-anchor="middle">FastAPI</text>
+    <rect x="316" y="1140" width="69" height="26" rx="13" fill="#f4f4f8" stroke="#e2e2ec"/><text x="350" y="1157" text-anchor="middle">Jinja2</text>
+    <rect x="395" y="1140" width="112" height="26" rx="13" fill="#f4f4f8" stroke="#e2e2ec"/><text x="451" y="1157" text-anchor="middle">SQLAlchemy 2</text>
+    <rect x="517" y="1140" width="76" height="26" rx="13" fill="#f4f4f8" stroke="#e2e2ec"/><text x="555" y="1157" text-anchor="middle">Alembic</text>
+    <rect x="603" y="1140" width="98" height="26" rx="13" fill="#f4f4f8" stroke="#e2e2ec"/><text x="652" y="1157" text-anchor="middle">vanilla JS</text>
+
+    <text x="44" y="1195" font-size="13.5" font-weight="700" fill="#66667a">AI &amp; agent</text>
+    <rect x="230" y="1178" width="120" height="26" rx="13" fill="#eef0ff" stroke="#c7c4f5"/><text x="290" y="1195" text-anchor="middle" fill="#3730a3">LangGraph 1.2</text>
+    <rect x="360" y="1178" width="84" height="26" rx="13" fill="#eef0ff" stroke="#c7c4f5"/><text x="402" y="1195" text-anchor="middle" fill="#3730a3">Mesh API</text>
+    <rect x="454" y="1178" width="98" height="26" rx="13" fill="#eef0ff" stroke="#c7c4f5"/><text x="503" y="1195" text-anchor="middle" fill="#3730a3">OpenAI SDK</text>
+    <rect x="562" y="1178" width="134" height="26" rx="13" fill="#eef0ff" stroke="#c7c4f5"/><text x="629" y="1195" text-anchor="middle" fill="#3730a3">NeMo Guardrails</text>
+    <rect x="706" y="1178" width="84" height="26" rx="13" fill="#eef0ff" stroke="#c7c4f5"/><text x="748" y="1195" text-anchor="middle" fill="#3730a3">DeepEval</text>
+
+    <text x="44" y="1233" font-size="13.5" font-weight="700" fill="#66667a">Data &amp; retrieval</text>
+    <rect x="230" y="1216" width="148" height="26" rx="13" fill="#f4f4f8" stroke="#e2e2ec"/><text x="304" y="1233" text-anchor="middle">SQLite / Postgres</text>
+    <rect x="388" y="1216" width="69" height="26" rx="13" fill="#f4f4f8" stroke="#e2e2ec"/><text x="422" y="1233" text-anchor="middle">Chroma</text>
+    <rect x="467" y="1216" width="84" height="26" rx="13" fill="#f4f4f8" stroke="#e2e2ec"/><text x="509" y="1233" text-anchor="middle">Pinecone</text>
+
+    <text x="44" y="1271" font-size="13.5" font-weight="700" fill="#66667a">Run &amp; observe</text>
+    <rect x="230" y="1254" width="69" height="26" rx="13" fill="#f4f4f8" stroke="#e2e2ec"/><text x="264" y="1271" text-anchor="middle">Docker</text>
+    <rect x="309" y="1254" width="105" height="26" rx="13" fill="#f4f4f8" stroke="#e2e2ec"/><text x="361" y="1271" text-anchor="middle">APScheduler</text>
+    <rect x="424" y="1254" width="91" height="26" rx="13" fill="#f4f4f8" stroke="#e2e2ec"/><text x="469" y="1271" text-anchor="middle">LangSmith</text>
+    <rect x="525" y="1254" width="192" height="26" rx="13" fill="#f4f4f8" stroke="#e2e2ec"/><text x="621" y="1271" text-anchor="middle">Logfire / OpenTelemetry</text>
+    <rect x="727" y="1254" width="98" height="26" rx="13" fill="#f4f4f8" stroke="#e2e2ec"/><text x="776" y="1271" text-anchor="middle">Prometheus</text>
+  </g>
+</svg>

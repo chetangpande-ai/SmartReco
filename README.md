@@ -23,6 +23,17 @@ paragraph around it.
 - **An operations dashboard** — sync health, call efficiency, the live agent graph, every run's full trace
 - **Fully offline-capable** — runs and tests with `LLM_ENABLED=false`, zero API key required
 
+## The platform on one page
+
+![SmartReco platform overview: the two user flows, the nine-phase agent, the four AI principles, key figures and the stack](docs/smartreco-overview.svg)
+
+Two entry paths, one catalogue. The agent runs nine phases and only two of them spend
+money on a model — the indigo ones. Everything else, including which courses a career
+plan contains, is computed.
+
+The same summary as a single slide, for a deck:
+[`docs/smartreco-onepager.pptx`](docs/smartreco-onepager.pptx).
+
 ## Contents
 
 - [Architecture](#architecture)
@@ -803,6 +814,12 @@ for exact counts instead of restating them:
 | [`docs/features.md`](docs/features.md) | One canonical feature inventory — career layer, learner-facing, admin-facing, responsible-AI, platform |
 | [`docs/evals.md`](docs/evals.md) | DeepEval integration, the custom GEval rubric, prompt versioning, PII scrubbing, red-teaming — full detail behind the "Evals, prompt versioning and red-teaming" section above |
 | [`docs/demo-script.md`](docs/demo-script.md) | A shot-by-shot script for recording a walkthrough video against the real running app |
+
+Two presentation assets sit alongside them, both derived from this README rather than
+maintained separately — regenerate them when the numbers above change:
+[`docs/smartreco-overview.svg`](docs/smartreco-overview.svg) (the one-page diagram) and
+[`docs/smartreco-onepager.pptx`](docs/smartreco-onepager.pptx) (the same summary as a
+single slide).
 
 ---
 
