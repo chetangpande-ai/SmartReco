@@ -154,9 +154,10 @@ management — in [`docs/architecture.md`](docs/architecture.md).
 **Operable**
 - **LangSmith** traces the graph with Mesh calls nested as real `llm` runs; **Logfire** traces the request around it; one run reaches both through LangSmith's OTel bridge — all verified against live projects
 - `/admin` shows sync health, LLM calls avoided and why, the compiled graph, every run's node path, prompt versions, tokens, cost and latency
+- **A per-learner audit** (`/admin/users`, searchable by name or email) — every signal captured, the profile inferred from it, the evidence list handed to the model, and each recommendation with its per-course reason, in the pipeline's own order. The evidence is read through the same `profile.evidence()` call the agent makes, so the page cannot show a different fact list than the model was given. "Why was I shown that?" is answerable without opening the database
 - APScheduler daily digest, idempotent per `digest:<user>:<date>`
 - **437 tests**, 92% coverage, hermetic and free — `LLM_ENABLED=false` runs everything offline
-- A [Support / FAQ page](app/templates/support.html) (`/support`) and [four docs](#documentation) covering architecture, low-level design, the full feature inventory and the evals/PII/red-teaming setup
+- A [Support / FAQ page](app/templates/support.html) (`/support`) and [six docs](#documentation) covering architecture, low-level design, the full feature inventory, the evals/PII/red-teaming setup and two recording scripts
 
 ---
 
@@ -803,7 +804,7 @@ that path is now one someone has actually walked.
 
 ## Documentation
 
-This README covers the what-and-why with evidence inline. Five docs go one level
+This README covers the what-and-why with evidence inline. Six docs go one level
 deeper, written to stay in sync with it rather than duplicate it — they link back here
 for exact counts instead of restating them:
 
@@ -814,6 +815,7 @@ for exact counts instead of restating them:
 | [`docs/features.md`](docs/features.md) | One canonical feature inventory — career layer, learner-facing, admin-facing, responsible-AI, platform |
 | [`docs/evals.md`](docs/evals.md) | DeepEval integration, the custom GEval rubric, prompt versioning, PII scrubbing, red-teaming — full detail behind the "Evals, prompt versioning and red-teaming" section above |
 | [`docs/demo-script.md`](docs/demo-script.md) | A shot-by-shot script for recording a walkthrough video against the real running app |
+| [`docs/video-script-3min.md`](docs/video-script-3min.md) | A 3-minute product video: the story spine, per-scene narration and word budgets, and the pre-flight state the app must be in before recording |
 
 Two presentation assets sit alongside them, both derived from this README rather than
 maintained separately — regenerate them when the numbers above change:

@@ -92,7 +92,7 @@ them in prose, so if you change one, grep for it there.
 | Taxonomy categories / skills | **21 / 628** | `taxonomy.taxonomy()` |
 | Career roles / paths | **22 / 10** | `taxonomy.roles()`, `taxonomy.paths()` |
 | Roadmap stages | **8** | `taxonomy.ROADMAP_STAGES` |
-| Event types | **12** current + 2 retired aliases | `schemas.EVENT_TYPES` |
+| Event types | **13** current + 2 retired aliases | `schemas.EVENT_TYPES` |
 | Tests / coverage | **437 / 92%** | `make cov` |
 | Catalogue ↔ taxonomy | **0 problems** | `make catalogue` |
 
