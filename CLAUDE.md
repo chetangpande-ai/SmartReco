@@ -64,8 +64,8 @@ make install    # uv sync --all-extras
 make migrate    # alembic upgrade head — run before `seed` on an existing database
 make seed       # 66 courses + 3 users, converges rather than skips
 make run        # :8000
-make test       # 426 tests, offline, ~50s
-make cov        # coverage, currently 91%
+make test       # 437 tests, offline, ~50s
+make cov        # coverage, currently 92%
 make lint       # ruff, currently clean
 make catalogue  # courses vs taxonomy, currently 0 problems
 make eval       # retrieval quality, needs a live index
@@ -93,7 +93,7 @@ them in prose, so if you change one, grep for it there.
 | Career roles / paths | **22 / 10** | `taxonomy.roles()`, `taxonomy.paths()` |
 | Roadmap stages | **8** | `taxonomy.ROADMAP_STAGES` |
 | Event types | **12** current + 2 retired aliases | `schemas.EVENT_TYPES` |
-| Tests / coverage | **426 / 91%** | `make cov` |
+| Tests / coverage | **437 / 92%** | `make cov` |
 | Catalogue ↔ taxonomy | **0 problems** | `make catalogue` |
 
 `node_path` counts `coldstart` as a real node; the numbered comments in `nodes.py` label

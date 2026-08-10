@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% from "admin/_subnav.html" import admin_subnav %}
+{% block title %}Users — SmartReco admin{% endblock %}
+
+{% block content %}
+<div class="admin-head">
+  <h1>Users</h1>
+  {{ admin_subnav('users') }}
+</div>
+
+<form class="admin-search" method="get" action="/admin/users">
+  <input type="search" name="q" value="{{ q }}" placeholder="Search by name or email…">
+</form>
+
+<p class="muted">
+  <strong>Events</strong> is every signal ever captured for that learner. The behaviour profile
+  the agent reads is a decayed window over it, so the two numbers are expected to differ.
+</p>
+
+<div class="table-scroll">
+<table class="data">
+  <thead>
+    <tr><th>User</th><th>Role</th><th class="num">Events</th>
+        <th class="num">Recommendations</th><th>Joined</th></tr>
+  </thead>
+  <tbody>
+  {% for u in users %}
+    <tr>
+      <td><a href="/admin/users/{{ u.id }}">{{ u.name or '(no name)' }}</a>
+          <div class="mono small muted">{{ u.email }}</div></td>
+      <td>{% if u.role == 'admin' %}<span class="badge badge-good">admin</span>
+          {% else %}<span class="badge">learner</span>{% endif %}</td>
+      <td class="num">{{ event_counts.get(u.id, 0) }}</td>
+      <td class="num">{{ rec_counts.get(u.id, 0) }}</td>
+      <td class="small">{{ u.created_at.strftime('%d %b %Y') }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="5" class="muted">No users match.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

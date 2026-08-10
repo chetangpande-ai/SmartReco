@@ -155,7 +155,7 @@ management — in [`docs/architecture.md`](docs/architecture.md).
 - **LangSmith** traces the graph with Mesh calls nested as real `llm` runs; **Logfire** traces the request around it; one run reaches both through LangSmith's OTel bridge — all verified against live projects
 - `/admin` shows sync health, LLM calls avoided and why, the compiled graph, every run's node path, prompt versions, tokens, cost and latency
 - APScheduler daily digest, idempotent per `digest:<user>:<date>`
-- **426 tests**, 91% coverage, hermetic and free — `LLM_ENABLED=false` runs everything offline
+- **437 tests**, 92% coverage, hermetic and free — `LLM_ENABLED=false` runs everything offline
 - A [Support / FAQ page](app/templates/support.html) (`/support`) and [four docs](#documentation) covering architecture, low-level design, the full feature inventory and the evals/PII/red-teaming setup
 
 ---
@@ -666,8 +666,8 @@ without reading logs — the question you ask once the demo is already running.
 ## Testing
 
 ```bash
-uv run pytest tests/ -q                                              # 426 tests, offline, no API key, spends nothing
-uv run pytest tests/ -q --cov=app --cov-report=term-missing          # coverage report (91%)
+uv run pytest tests/ -q                                              # 437 tests, offline, no API key, spends nothing
+uv run pytest tests/ -q --cov=app --cov-report=term-missing          # coverage report (92%)
 uv run python scripts/eval_retrieval.py                              # retrieval quality against 20 paraphrase probes
 uv run python scripts/eval_generation.py                             # DeepEval RAG metrics + custom rubric on real generate() output (costs tokens)
 uv run python scripts/red_team.py                                    # adversarial prompt-injection probes (costs tokens)

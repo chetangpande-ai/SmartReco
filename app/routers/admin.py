@@ -10,17 +10,28 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from pydantic import ValidationError
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy import func, or_, select
+from sqlalchemy.orm import Session, selectinload
 
-from app import scheduler
+from app import scheduler, taxonomy
 from app.agent.graph import describe
 from app.config import settings
 from app.db import get_db
 from app.deps import require_admin, verify_csrf
-from app.models import Event, Notification, Product, Recommendation, User, VectorOutbox
+from app.models import (
+    AgentRun,
+    CareerProfile,
+    Event,
+    Notification,
+    Product,
+    Recommendation,
+    RecommendationItem,
+    User,
+    UserProfile,
+    VectorOutbox,
+)
 from app.schemas import ProductIn
-from app.services import catalog, notify, outbox, recommender, triggers
+from app.services import catalog, notify, outbox, profile, recommender, triggers
 from app.services.mesh import mesh
 from app.templating import render
 
@@ -168,13 +179,100 @@ def send_digest_now():
     return RedirectResponse("/admin", status_code=303)
 
 
+@router.get("/users")
+def list_users(request: Request, q: str = "", db: Session = Depends(get_db)):
+    stmt = select(User).order_by(User.created_at.desc()).limit(200)
+    if q.strip():
+        like = f"%{q.strip()}%"
+        stmt = stmt.where(or_(User.name.ilike(like), User.email.ilike(like)))
+    users = list(db.scalars(stmt))
+
+    # Two grouped queries rather than a count per row. The seed alone makes 24 synthetic
+    # learners, so a per-user count inside the loop is quadratic on the page that exists
+    # to survey everyone.
+    ids = [u.id for u in users] or [-1]
+    def totals(column) -> dict[int, int]:
+        return dict(
+            db.execute(
+                select(column, func.count()).where(column.in_(ids)).group_by(column)
+            ).all()
+        )
+
+    return render(
+        request,
+        "admin/users.html",
+        users=users,
+        q=q,
+        event_counts=totals(Event.user_id),
+        rec_counts=totals(Recommendation.user_id),
+    )
+
+
+@router.get("/users/{user_id}")
+def user_detail(request: Request, user_id: int, db: Session = Depends(get_db)):
+    """Everything the system captured about one learner, and what it recommended from it.
+
+    The evidence list is read through `profile.evidence()` — the same call the agent
+    makes — rather than rebuilt here. A second reconstruction would be free to drift from
+    what the model was actually handed, which is the one thing this page is for.
+    """
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no such user")
+
+    # A target role is a role slug, not a skill slug — the `skill` filter would fall back
+    # to title-casing it and render "Ai Engineer".
+    career = db.get(CareerProfile, user_id)
+    target_role = taxonomy.role(career.target_role) if career else None
+
+    return render(
+        request,
+        "admin/user_detail.html",
+        user=user,
+        user_profile=db.get(UserProfile, user_id),
+        career=career,
+        target_role=target_role,
+        evidence=profile.evidence(db, user_id),
+        events_by_type=dict(
+            db.execute(
+                select(Event.type, func.count())
+                .where(Event.user_id == user_id)
+                .group_by(Event.type)
+                .order_by(func.count().desc())
+            ).all()
+        ),
+        events=list(
+            db.scalars(
+                select(Event)
+                .where(Event.user_id == user_id)
+                .options(selectinload(Event.product))
+                .order_by(Event.server_ts.desc())
+                .limit(30)
+            )
+        ),
+        recommendations=list(
+            db.scalars(
+                select(Recommendation)
+                .where(Recommendation.user_id == user_id)
+                .options(selectinload(Recommendation.items).selectinload(RecommendationItem.product))
+                .order_by(Recommendation.created_at.desc())
+                .limit(10)
+            )
+        ),
+        runs=list(
+            db.scalars(
+                select(AgentRun)
+                .where(AgentRun.user_id == user_id)
+                .order_by(AgentRun.created_at.desc())
+                .limit(20)
+            )
+        ),
+    )
+
+
 @router.get("/agent-runs")
 def agent_runs(request: Request, db: Session = Depends(get_db)):
     runs = recommender.recent_runs(db, 100)
-    users = {
-        u.id: u
-        for u in db.scalars(select(User).where(User.id.in_([r.user_id for r in runs] or [-1])))
-    }
     totals = {
         "runs": len(runs),
         "llm_calls": sum(r.llm_calls for r in runs),
@@ -184,5 +282,5 @@ def agent_runs(request: Request, db: Session = Depends(get_db)):
         "errors": sum(1 for r in runs if r.status != "ok"),
     }
     return render(
-        request, "admin/agent_runs.html", runs=runs, users=users, totals=totals, settings=settings
+        request, "admin/agent_runs.html", runs=runs, totals=totals, settings=settings
     )

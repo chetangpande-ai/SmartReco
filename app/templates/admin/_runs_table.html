@@ -12,7 +12,10 @@
   {% for r in runs %}
     <tr class="{{ 'row-bad' if r.status != 'ok' else '' }}">
       <td class="small">{{ r.created_at.strftime('%d %b %H:%M:%S') }}</td>
-      <td class="small">{{ r.user_id }}</td>
+      <td class="small">
+        {% if r.user_id %}<a href="/admin/users/{{ r.user_id }}">{{ r.user_id }}</a>
+        {% else %}<span class="muted">—</span>{% endif %}
+      </td>
       <td><span class="pill pill-plain">{{ r.trigger }}</span></td>
       <td class="mono small">{{ r.node_path|join('→') }}</td>
       <td class="small">

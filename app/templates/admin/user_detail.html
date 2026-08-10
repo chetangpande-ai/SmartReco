@@ -1,0 +1,160 @@
+{#
+  One learner, end to end: what was captured, what was inferred from it, what the model
+  was allowed to cite, and what it recommended as a result. The order is the pipeline's
+  order on purpose — this page is read top-to-bottom when someone asks "why was I shown
+  that?", and answering it means walking the same path the agent walked.
+#}
+{% extends "base.html" %}
+{% from "admin/_subnav.html" import admin_subnav %}
+{% block title %}{{ user.name or user.email }} — SmartReco admin{% endblock %}
+
+{% block content %}
+<div class="admin-head">
+  <h1>{{ user.name or '(no name)' }}</h1>
+  {{ admin_subnav('users') }}
+</div>
+
+<p class="muted">
+  <span class="mono">{{ user.email }}</span> · id {{ user.id }} · {{ user.role }} ·
+  joined {{ user.created_at.strftime('%d %b %Y') }} ·
+  <a class="link" href="/admin/users">← all users</a>
+</p>
+
+<div class="stat-row">
+  <div class="stat">
+    <span class="stat-value">{{ events_by_type.values()|sum }}</span>
+    <span class="stat-label">events captured</span>
+  </div>
+  <div class="stat">
+    <span class="stat-value">{{ recommendations|length }}</span>
+    <span class="stat-label">recommendations</span>
+  </div>
+  <div class="stat">
+    <span class="stat-value">{{ runs|length }}</span>
+    <span class="stat-label">agent runs</span>
+  </div>
+  <div class="stat">
+    <span class="stat-value">${{ '%.5f'|format(runs|sum(attribute='cost_usd')) }}</span>
+    <span class="stat-label">spend</span>
+  </div>
+</div>
+
+<h2>Captured</h2>
+{% if events_by_type %}
+  <div class="table-scroll">
+  <table class="data">
+    <thead><tr><th>Signal</th><th class="num">Count</th></tr></thead>
+    <tbody>
+    {% for kind, n in events_by_type.items() %}
+      <tr><td><span class="pill pill-plain">{{ kind }}</span></td><td class="num">{{ n }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Last 30 events</h3>
+  <div class="table-scroll">
+  <table class="data">
+    <thead><tr><th>When</th><th>Type</th><th>What</th><th class="num">Dwell</th></tr></thead>
+    <tbody>
+    {% for e in events %}
+      <tr>
+        <td class="small">{{ e.server_ts.strftime('%d %b %H:%M:%S') }}</td>
+        <td class="small">{{ e.type }}</td>
+        <td class="small">
+          {% if e.product %}<a href="/products/{{ e.product.slug }}">{{ e.product.title }}</a>
+          {% elif e.query %}<span class="mono">“{{ e.query }}”</span>
+          {% else %}<span class="mono muted">{{ e.path }}</span>{% endif %}
+        </td>
+        <td class="num small">{% if e.dwell_ms %}{{ e.dwell_ms }}ms{% else %}—{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+{% else %}
+  <p class="muted">Nothing captured for this user yet.</p>
+{% endif %}
+
+<h2>Inferred</h2>
+{% if user_profile %}
+  <table class="data">
+    <tbody>
+      <tr><td>Interests</td><td>
+        {% for cat, score in user_profile.interests.items()|sort(attribute='1', reverse=true) %}
+          <span class="pill pill-plain">{{ cat|track }} {{ '%.2f'|format(score) }}</span>
+        {% else %}<span class="muted">—</span>{% endfor %}
+      </td></tr>
+      <tr><td>Recent queries</td><td>
+        {% for query in user_profile.recent_queries[:8] %}
+          <span class="mono small">“{{ query }}”</span>
+        {% else %}<span class="muted">—</span>{% endfor %}
+      </td></tr>
+      <tr><td>Level affinity</td><td>{{ user_profile.tier_affinity or '—' }}</td></tr>
+      <tr><td>Profile window</td><td class="small">
+        {{ user_profile.events_total }} events, {{ user_profile.events_since_rec }} since the
+        last recommendation
+      </td></tr>
+    </tbody>
+  </table>
+{% else %}
+  <p class="muted">No behaviour profile yet — it is built on the first batch of events.</p>
+{% endif %}
+
+{% if career %}
+  <h3>Career profile</h3>
+  <p class="small">
+    {{ career.current_role or '—' }} · {{ career.years_experience }}y · targeting
+    <strong>{{ target_role.name if target_role else career.target_role }}</strong>
+  </p>
+  <p>
+    {% for s in career.skills %}
+      <span class="pill pill-plain">{{ s|skill }}</span>
+    {% endfor %}
+    {% for s in career.extra_skills %}
+      <span class="pill">{{ s }} (unmatched)</span>
+    {% endfor %}
+  </p>
+{% endif %}
+
+<h2>Evidence the model was allowed to cite</h2>
+{% if evidence %}
+  <ul class="evidence">{% for fact in evidence %}<li>You {{ fact }}</li>{% endfor %}</ul>
+  <p class="muted small">
+    Read through the same <span class="mono">profile.evidence()</span> call the agent makes.
+    Nothing outside this list can appear in the generated copy.
+  </p>
+{% else %}
+  <p class="muted">Not enough activity to cite anything yet.</p>
+{% endif %}
+
+<h2>Recommended</h2>
+{% for rec in recommendations %}
+  <div class="rec-audit">
+    <p class="small">
+      {{ rec.created_at.strftime('%d %b %H:%M') }} ·
+      <span class="pill pill-plain">{{ rec.strategy }}</span>
+      <span class="pill pill-plain">{{ rec.trigger_reason }}</span>
+      confidence {{ '%.2f'|format(rec.confidence) }}
+      {% if rec.is_current %}<span class="badge badge-good">current</span>{% endif %}
+    </p>
+    <p><strong>{{ rec.headline }}</strong></p>
+    <table class="data">
+      <tbody>
+      {% for item in rec.items %}
+        <tr>
+          <td class="num small">{{ item.rank + 1 }}</td>
+          <td><a href="/products/{{ item.product.slug }}">{{ item.product.title }}</a></td>
+          <td class="small muted">{{ item.reason }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <p class="muted">Nothing recommended yet.</p>
+{% endfor %}
+
+<h2>Agent runs</h2>
+{% include "admin/_runs_table.html" %}
+{% endblock %}

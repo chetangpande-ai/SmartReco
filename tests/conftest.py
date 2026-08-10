@@ -50,6 +50,7 @@ from app.models import (  # noqa: E402
     UserProfile,
     VectorOutbox,
 )
+from app.ratelimit import auth_limiter, events_limiter, recommend_limiter  # noqa: E402
 from app.schemas import ProductIn  # noqa: E402
 from app.security import hash_password  # noqa: E402
 
@@ -173,6 +174,13 @@ def _clean_volatile_tables(_database):
     with session_scope() as db:
         for model in _VOLATILE:
             db.execute(delete(model))
+
+    # The limiters key on client IP, which is one constant string for the whole suite, so
+    # their buckets outlive the users that spent them. auth_limiter holds ten
+    # registrations total — without this, adding a test that registers makes some *other*
+    # test 429 and fail with a null user, a long way from the cause.
+    for limiter in (events_limiter, auth_limiter, recommend_limiter):
+        limiter.prune(0)
 
 
 @pytest.fixture

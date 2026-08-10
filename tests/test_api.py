@@ -22,10 +22,10 @@ def csrf(client) -> dict:
     return {CSRF_FIELD: client.cookies.get(CSRF_COOKIE)}
 
 
-def register(client, email="apiuser@example.com", password="password12345"):
+def register(client, email="apiuser@example.com", password="password12345", name="API User"):
     return client.post(
         "/register",
-        data={"email": email, "password": password, "name": "API User", **csrf(client)},
+        data={"email": email, "password": password, "name": name, **csrf(client)},
         follow_redirects=False,
     )
 
@@ -303,6 +303,43 @@ class TestAdminAccessControl:
         assert "Operations" in client.get("/admin").text
         assert "Catalogue" in client.get("/admin/products").text
         assert "Agent runs" in client.get("/admin/agent-runs").text
+        assert "Users" in client.get("/admin/users").text
+
+    def test_the_user_page_shows_what_was_captured_and_what_it_produced(self, client):
+        register(client, "audited@example.com")
+        client.post("/api/events/batch", json={"events": [
+            {"type": "search", "query": "machine learning", "idem": "aud-1"},
+            {"type": "page_view", "path": "/courses", "idem": "aud-2"},
+        ]})
+        _flush(client)
+        with session_scope() as db:
+            user = db.scalar(select(User).where(User.email == "audited@example.com"))
+            user.role = "admin"
+            user_id = user.id
+
+        page = client.get(f"/admin/users/{user_id}").text
+        assert "audited@example.com" in page
+        assert "search" in page
+        # The search term reaches the page through evidence(), which is the whole point:
+        # an admin sees the same fact list the model was handed, not a second rendering
+        # of the raw events that could disagree with it.
+        assert "machine learning" in page
+
+    def test_searching_users_by_name_filters_the_list(self, client):
+        register(client, "findme@example.com", name="Verona Kaur")
+        register(client, "otheruser@example.com", name="Other Person")
+        with session_scope() as db:
+            db.scalar(select(User).where(User.email == "otheruser@example.com")).role = "admin"
+
+        assert "Verona Kaur" in client.get("/admin/users?q=verona").text
+        assert "Verona Kaur" not in client.get("/admin/users?q=nobodyhere").text
+
+    def test_an_unknown_user_is_404_not_a_500(self, client):
+        register(client, "admin404@example.com")
+        with session_scope() as db:
+            db.scalar(select(User).where(User.email == "admin404@example.com")).role = "admin"
+
+        assert client.get("/admin/users/999999").status_code == 404
 
     def test_admin_can_create_a_product_and_it_reaches_the_vector_store(self, client):
         from app.services.vectorstore import get_vector_store

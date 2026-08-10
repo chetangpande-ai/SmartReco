@@ -62,7 +62,14 @@ kept apart.
   the compiled LangGraph object (so it can't drift from what actually runs), scheduler
   status.
 - **Agent runs** — every run's node path, grade score, refine count, tokens, cost,
-  latency, prompt versions used, and a LangSmith trace link when tracing is on.
+  latency, prompt versions used, and a LangSmith trace link when tracing is on. The user
+  column links through to that learner's page.
+- **Per-user audit** (`/admin/users`, searchable by name or email) — one learner end to
+  end, in the pipeline's own order: every signal captured, the interest profile inferred
+  from it, the evidence list the model was allowed to cite, and each recommendation with
+  its per-course reason. The evidence is read through the same `profile.evidence()` call
+  the agent makes, so the page cannot show a different fact list than the model was given.
+  Answers "why was I shown that?" without reading the database by hand.
 - **Catalogue management** — create/edit/publish courses; publishing/unpublishing
   triggers a dual-write to the vector index via a transactional outbox, not a
   direct call from the request handler.
