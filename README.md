@@ -1,230 +1,106 @@
 # SmartReco
 
-**A career learning marketplace with an AI agent that decides what each learner should
-study next — and why.**
+**Any learning platform can show you a catalogue. SmartReco tells you which course is
+next — and proves it didn't make it up.**
 
-Two engines, deliberately different. A **LangGraph agent** watches how each learner
-actually behaves, retrieves matching courses from a vector database, and writes a
-persuasive recommendation that is *grounded in the real catalogue* and *checked for
-honesty* before anyone sees it. Alongside it, an **AI Career Advisor** takes a stated
-background and target role and computes the skill gap between them — which of your
-skills already count, which are genuinely missing, and the order to close them in.
-
-The division matters: in the career engine the model **never picks a course**. The plan
-comes from a skill graph and is handed to the model as settled fact; it writes only the
-paragraph around it.
-
-- **Behavioural tracking** — search, clicks, dwell time, wishlist/enroll/dismiss, captured without slowing the page down
-- **An agent that reasons**, not a template — LangGraph, hybrid retrieval, LLM-as-judge grading, a groundedness verifier
-- **A career skill graph** — 21 categories, 628 skills, 22 roles, 10 career paths, joined to the catalogue so "what should I learn next?" is answerable, not guessed
-- **Collaborative filtering + a heuristic ranker** on top of content-based retrieval, with an exploration slot so the same best guess doesn't compound forever
-- **Guardrails, evals and red-teaming** — deterministic rails always on, DeepEval metrics, adversarial probes against the real generation path
-- **Cost control by design** — an 11-gate trigger policy, daily budget, circuit breaker, and a ranker that skips the LLM call when it's already confident
-- **An operations dashboard** — sync health, call efficiency, the live agent graph, every run's full trace
-- **Fully offline-capable** — runs and tests with `LLM_ENABLED=false`, zero API key required
-
-## The platform on one page
+|  |  |
+|---|---|
+| **What** | A career learning marketplace over 66 real courses, with two AI engines under it |
+| **For** | Learners who know they need to upskill, but not in what order |
+| **Different** | In the career engine the model **never picks a course** — plans are computed from a 628-skill graph. A ten-year QA engineer is never told to learn testing |
+| **Proof** | 4/4 prompt-injection attacks blocked · only 2 of the agent's 9 nodes spend tokens · 437 tests, 92% coverage · runs fully offline with no API key |
 
 ![SmartReco platform overview: the two user flows, the nine-phase agent, the four AI principles, key figures and the stack](docs/smartreco-overview.svg)
 
-Two entry paths, one catalogue. The agent runs nine phases and only two of them spend
-money on a model — the indigo ones. Everything else, including which courses a career
-plan contains, is computed.
+## How a learner uses it
 
-The same summary as a single slide, for a deck:
-[`docs/smartreco-onepager.pptx`](docs/smartreco-onepager.pptx).
-
-## Contents
-
-- [Architecture](#architecture)
-- [Key features](#key-features)
-- [What it looks like](#what-it-looks-like)
-- [Quickstart](#quickstart)
-- [Core capabilities, in depth](#core-capabilities-in-depth)
-- [Beyond the basics](#beyond-the-basics)
-- [Why it's built this way](#why-its-built-this-way)
-- [Testing](#testing)
-- [Configuration](#configuration)
-- [Deployment](#deployment)
-- [Honest limitations](#honest-limitations)
-- [Documentation](#documentation)
-- [Stack](#stack)
-
-## Architecture
-
-```
-┌──────────────────────────────── BROWSER ─────────────────────────────────────┐
-│ Jinja2 pages · tracker.js → throttle → batch(20 | 5s) → sendBeacon ──┐       │
-└──────────────────────────────────────────────────────────────────────┼───────┘
-                                                          202 in ~10ms │
-┌──────────────────────────── FastAPI ─────────────────────────────────▼───────┐
-│                                                                              │
-│  ┌── INGEST ─────────┐   ┌── TRIGGER POLICY ────┐   ┌── AGENT (LangGraph) ─┐ │
-│  │ bounded queue     │──▶│ enough events?       │──▶│ analyze → plan →     │ │
-│  │ dedupe by idem key│   │ cooldown elapsed?    │   │ retrieve → grade →   │ │
-│  │ chunked bulk write│   │ interests drifted?   │   │  (refine ⟲ ≤2) →     │ │
-│  └────────┬──────────┘   │ budget left?         │   │ generate → verify →  │ │
-│           │              │ signature cached? ─skip│  │ finalize             │ │
-│           ▼              └──────────────────────┘   └──────┬───────────────┘ │
-│  ┌── PROFILE ────────┐                                     │                 │
-│  │ 48h half-life     │      ┌── RETRIEVAL ──────────────┐  │                 │
-│  │ intent weighting  │─────▶│ vector kNN ⊕ BM25         │◀─┘                 │
-│  │ interest centroid │      │ → RRF → filter → MMR      │                    │
-│  └───────────────────┘      └───────────────────────────┘                    │
-│  ┌── OUTBOX WORKER ──┐   ┌── APScheduler ────────────────────────────────┐   │
-│  │ drain · backoff   │   │ 16:00 digest · 60s outbox · 1h reconcile      │   │
-│  └────────┬──────────┘   └───────────────────────────────────────────────┘   │
-└───────────┼──────────────────────┬────────────────┬──────────────┬───────────┘
-            ▼                      ▼                ▼              ▼
-     ┌─────────────┐      ┌──────────────┐   ┌────────────┐  ┌───────────┐
-     │ SQLite / PG │      │   Mesh API   │   │  ChromaDB  │  │   SMTP    │
-     │  14 tables  │      │ chat + embed │   │ / Pinecone │  │ / file    │
-     └─────────────┘      └──────────────┘   └────────────┘  └───────────┘
+```mermaid
+flowchart TD
+    A[Learner arrives] --> B{Knows their goal?}
+    B -->|Yes| C[AI Career Advisor<br/>state role + target role]
+    B -->|No| D[Browse catalogue<br/>search · click · dwell]
+    C --> E[Skill gap computed<br/>628-skill graph, no LLM]
+    E --> F[8-stage roadmap<br/>courses in prerequisite order]
+    D --> G[Behaviour profile<br/>48h decay, intent weights]
+    G --> H[LangGraph agent<br/>retrieve → grade → generate → verify]
+    H --> I[Recommendations<br/>+ 'Why these?' evidence]
+    F --> J[Enroll · complete]
+    I --> J
+    J --> K[Career dial moves<br/>3/9 → 4/9]
+    K --> C
 ```
 
-Full write-up — components, request path, and short-term vs. long-term context
-management — in [`docs/architecture.md`](docs/architecture.md).
+Two entry paths, one catalogue. They converge: completing a course moves the career dial,
+which feeds the next plan.
 
----
+## What makes it different
 
-## Key features
+**The model does not choose the courses.** In the career engine the plan comes from a
+skill graph and is handed to the model as settled fact — it writes only the paragraph
+around it. A template fallback produces the same plan with `LLM_ENABLED=false`. "Which
+course teaches RAG, and what must you know first" is answerable from data; a career plan
+is the most consequential thing this platform says to anyone.
 
-**Behaviour capture that cannot slow the page down**
-- Thirteen signal types: `page_view` · `product_view` · `product_click` · `search` · `search_result_click` · `filter` · `scroll_depth` (25/50/75/100) · `dwell` · `wishlist` · `enroll` · `rec_impression` · `rec_click` · `dismiss` — a click *from search results* is a different, higher-intent event than a click from a browse tile, and is weighted accordingly. `dismiss` ("not interested") is pinned at zero weight by construction — it suppresses, it never scores as interest
-- Batched at 20 events or 5 s; scroll throttled, search debounced; `sendBeacon` on unload so the final dwell is never lost
-- **p50 3.0 ms** for a page's worth of events — less than rendering the page itself
-- `localStorage` spill-over retries through 429s and 5xx; every event carries an idempotency key
+**Three ranking rules, each earned by a specifically bad plan it prevents.** Skills imply
+skills (a ten-year tester is not told to learn testing). Seniority is per-skill (fifteen
+years of QA does not skip the intro to machine learning). Interview-prep courses never
+teach a gap (they list Python because their problems are written in it).
 
-**A catalogue that cannot silently diverge**
-- **Transactional outbox**: the row and its sync intent commit together, so an outage is a delay, not divergence
-- Hourly `reconcile()` diffs SQL against the index by content hash and repairs `missing`, `stale` and `orphaned` drift — all three verified live on **both** vector backends
-- Unpublishing enqueues a delete, so the index holds *exactly* the published courses
+**Copy that is persuasive *and* checkable.** The agent cites only concrete facts about
+what the learner actually did — shown to them as "Why these?". 35 deterministic checks
+block job guarantees, invented statistics, fake scarcity and prices not in the catalogue.
+A groundedness verifier drops any course that was never offered to it.
 
-**A career graph, not just a course grid** — the AI Career Advisor
-- `Category → Subcategory → Topic → Skill → Course → Career Path → Career Role`, all one
-  skill vocabulary: **21 categories, 628 skills, 22 roles, 10 career paths**, loaded from
-  [`app/data/taxonomy.json`](app/data/taxonomy.json) and joined to courses through
-  `course_skills`. Adding a role or a path is a data edit — no template changes
-- Tell it where you are and where you want to be, and it computes **what you already
-  have, what is genuinely missing, and the order to close it in** — then renders an
-  eight-stage roadmap: *current skills → skills to learn → courses → projects →
-  assessment → certification → interview prep → target role*
-- **The model does not choose the courses.** The plan is computed from the skill graph
-  and handed to the model as settled fact; it writes the narrative around it. A template
-  fallback produces the same plan with `LLM_ENABLED=false`, which is how the tests run
-- Three rules do the quality work, each earned by a specifically bad plan it prevents:
-  **skills imply skills** (a ten-year tester is not told to learn testing), **seniority
-  is per-skill** (fifteen years of QA does not skip the intro to machine learning), and
-  **interview-prep courses never teach a gap** (they list Python because their problems
-  are written in it)
-- **"Ask AI if this course is right for me"** on every course page, and it is willing to
-  say no: the prerequisite check is computed, not guessed, so it answers *"not yet — this
-  assumes Python and LLM Fundamentals"* rather than always saying yes
-- `make catalogue` fails the build when a skill slug drifts, because a typo there does
-  not raise — it silently produces a roadmap step with no course behind it
-
-**An agent that reasons, not a template**
-- **LangGraph**: 9 nodes and 3 branch points (6 conditional edges), a bounded refine loop (≤2) and a repair loop (×1)
-- Hybrid retrieval — vector kNN ⊕ BM25 → **RRF** → metadata filters → **MMR** → LLM re-rank
-- **recall@1 0.95 · recall@5 1.00 · MRR 0.975** over 20 paraphrase probes
-- **Groundedness verifier**: a recommended id that was never offered is dropped and the draft repaired
-
-**Ranking that learns beyond one person's history**
-- **Item-to-item collaborative filtering** as a third retrieval leg, fused in via a second RRF pass alongside vector⊕lexical — "learners who enrolled in what you enrolled in also enrolled in these." A learner with no history yet gets provably byte-identical behaviour to before this leg existed
-- **A deterministic heuristic ranker** (`app/agent/ranking.py`) scores every candidate from data already in memory — no new query — and skips the LLM grading call outright when it's confident, recorded as `grade_skipped_heuristic_confident` in `/admin`'s call-efficiency panel. Hand-weighted, not trained: there's no labelled outcome data at this catalogue's scale to fit weights from, and the docs say so
-- **A bandit-style exploration slot** — with probability `EXPLORE_EPSILON` (15% default), one recommendation slot goes to a genuinely under-shown course instead of the ranker's actual top pick, so the same best-guess set can't compound its own popularity forever
-- **"Not interested"** on any recommended card — suppressed from every future recommendation, including the cold-start path (`popular()` already supported `exclude_ids`; `coldstart()` just wasn't passing it — fixed alongside this)
-
-**Copy that is persuasive *and* checkable**
-- Cites only `evidence()` — concrete facts about what the learner actually did, shown to them as "Why these?"
-- **35 deterministic checks** — 31 regex rails plus discount, catalogue-price, PII and length cross-checks — block job guarantees, invented statistics, fake scarcity and prices that aren't in the catalogue. Always on, free, offline, in CI
-- Returns **fewer** than `REC_TOP_K` rather than padding with a filler
-
-**Measured and red-teamed, not just guardrailed**
-- DeepEval RAG metrics (faithfulness, answer relevancy) plus a custom GEval rubric mirrored line-for-line from the generation prompt's hard rules — `uv run python scripts/eval_generation.py`
-- Adversarial probes against the real `generate → verify` path — prompt injection via a search query, a fake system-role marker, a compromised catalogue description, a roleplay jailbreak — `uv run python scripts/red_team.py`, **4/4 blocked** in a live run
-- PII is scrubbed on the **input** side (search queries, before they reach a prompt), not just checked on the way out
-- Every run records which prompt version produced it (`AgentRun.prompt_versions`), so a quality shift traces back to the prompt that caused it — see [`docs/evals.md`](docs/evals.md)
-
-**Spending that is deliberate**
-- **11 trigger gates**, cheapest-first, each recording why it skipped
-- Cache keyed on the *ranked order* of interests, not raw scores — scores drift on every event, order does not
-- Daily USD budget, per-user daily cap, circuit breaker, embedding cache (re-seeding costs **$0**)
-
-**Operable**
-- **LangSmith** traces the graph with Mesh calls nested as real `llm` runs; **Logfire** traces the request around it; one run reaches both through LangSmith's OTel bridge — all verified against live projects
-- `/admin` shows sync health, LLM calls avoided and why, the compiled graph, every run's node path, prompt versions, tokens, cost and latency
-- **A per-learner audit** (`/admin/users`, searchable by name or email) — every signal captured, the profile inferred from it, the evidence list handed to the model, and each recommendation with its per-course reason, in the pipeline's own order. The evidence is read through the same `profile.evidence()` call the agent makes, so the page cannot show a different fact list than the model was given. "Why was I shown that?" is answerable without opening the database
-- APScheduler daily digest, idempotent per `digest:<user>:<date>`
-- **437 tests**, 92% coverage, hermetic and free — `LLM_ENABLED=false` runs everything offline
-- A [Support / FAQ page](app/templates/support.html) (`/support`) and [six docs](#documentation) covering architecture, low-level design, the full feature inventory, the evals/PII/red-teaming setup and two recording scripts
-
----
+**Spending is deliberate.** An 11-gate trigger policy decides whether a model call is
+worth making *before* the agent runs, and every skip records its reason — cache hit,
+interests unchanged, cooldown, warming up — visible live in `/admin`. Only 2 of the
+agent's 9 nodes spend tokens at all.
 
 ## What it looks like
 
-Every image below is captured from a running instance by
-[`scripts/screenshots.py`](scripts/screenshots.py) — re-run it after a UI change rather
-than replacing them by hand, because screenshots rot silently and nothing fails to warn
-you.
+Captured from a running instance by [`scripts/screenshots.py`](scripts/screenshots.py).
 
-**The home page** leads with the career question, not a course grid. Any learning
-platform can show you a catalogue; the one thing this platform claims is that it knows
-which of those courses *you* should take, and in what order.
-
-![SmartReco home page with the AI career advisor banner](docs/screenshots/home.png)
-
-**The roadmap** is the whole argument in one screen. This is a QA engineer of ten years
-moving into AI engineering. Read the first two stages together: *Selenium*, *API Testing*
-and *Java* are marked as **transferring**, and *Testing* is **absent from the gap list**
-— the system knows that someone who lists Selenium has been testing for a living. Then
-the six courses run in an order where each one only assumes what the one before it
-taught: Python → GenAI → agents → AI testing.
-
-Nothing on this page was chosen by a language model. It is a set difference against the
-role's requirements, walked along a career path.
+**The roadmap is the whole argument in one screen** — a QA engineer of ten years moving
+into AI engineering. *Selenium*, *API Testing* and *Java* are marked **transferring**, and
+*Testing* is **absent from the gap list**. Then six courses in an order where each only
+assumes what the one before it taught. Nothing here was chosen by a language model.
 
 ![QA Engineer to AI Engineer roadmap, eight stages](docs/screenshots/career-roadmap.png)
 
-**The advisor** that produced it. Free text in — *"Java, Selenium, API testing"* — matched
-against a 628-skill vocabulary, so the spelling does not have to be exact and anything
-unrecognised is shown back rather than silently dropped.
-
-![The AI Career Advisor intake form and generated plan](docs/screenshots/career-advisor.png)
-
-**One personal page**, not two. The agent's picks with the reason attached to each card,
-a *"Because you viewed…"* row, the library, and a career dial that reads **3/9** — the
-skills this learner can now do out of the nine the role asks for. That number moves when
-they *complete* a course, because a completed course is the one claim here we can verify.
+**One personal page** — the agent's picks with a reason on each card, and a career dial
+reading **3/9**, which moves when a course is *completed*, because that is the one claim
+here we can verify.
 
 ![The learner dashboard with recommendations and career progress](docs/screenshots/dashboard.png)
 
-**A course page** — objectives, skills, prerequisites, curriculum, labs and projects, plus
-the *"Ask AI if this course is right for me"* button that is willing to answer **no**.
-
-![Course detail page](docs/screenshots/course-detail.png)
-
-**The marketplace** — ten filter groups, all of them links, so any combination of
-category, career role, level, format, duration, price, rating and certificate is a
-shareable URL that survives the back button.
-
-![The filtered course marketplace](docs/screenshots/marketplace.png)
-
-**Explore** — the taxonomy itself: 21 categories and their topic areas, with the
-individual skills one click deeper. Every skill page is also a career page, because the
-roles that need it are one join away.
-
-![Explore learning, browsing the taxonomy](docs/screenshots/explore.png)
-
 **Operations** — SQL↔vector sync health, the trigger policy's skip reasons with a live
-"avoided" ratio, the agent graph **read from the compiled LangGraph object** so it
-cannot drift from what actually runs, the scheduler's next fire times, and every run's
-node path, grade and refine count. Those
-`analyze→plan→retrieve→grade→refine→retrieve→grade→…` rows are real refine loops.
+"avoided" ratio, and the agent graph **read from the compiled LangGraph object** so it
+cannot drift from what runs. Those `retrieve→grade→refine→retrieve→grade→…` rows are real
+refine loops.
 
 ![Admin operations dashboard](docs/screenshots/admin.png)
 
----
+**Per-learner audit** — everything captured, the profile inferred from it, the exact facts
+the model was given, and each recommendation with its reason. "Why was I shown that?" is
+answerable without opening the database.
+
+More: [the home page](docs/screenshots/home.png) ·
+[the advisor](docs/screenshots/career-advisor.png) ·
+[a course page](docs/screenshots/course-detail.png) ·
+[the marketplace](docs/screenshots/marketplace.png) ·
+[the taxonomy](docs/screenshots/explore.png)
+
+## Key numbers
+
+| | |
+|---|---|
+| Catalogue | 66 courses · 21 categories · 628 skills · 22 roles · 10 career paths |
+| Agent | 9 LangGraph nodes, **2 spend tokens** · 6 conditional edges · bounded refine + repair loops |
+| Retrieval | vector ⊕ BM25 → RRF → MMR → LLM re-rank — **recall@1 0.95 · recall@5 1.00 · MRR 0.975** |
+| Safety | 35 deterministic checks · groundedness verifier · **4/4 injection probes blocked** |
+| Cost | 11 trigger gates · daily budget · circuit breaker · every skip records **why**, shown live in `/admin` |
+| Ingest | 202 accepted in **3.0 ms p50** for a page's worth of events |
+| Quality | **437 tests · 92% coverage** · hermetic, offline, no API key |
 
 ## Quickstart
 
@@ -242,460 +118,90 @@ uv run uvicorn app.main:app --reload --port 8000    # http://localhost:8000
 | learner | `learner@smartreco.dev` | `learner12345` |
 
 **It also runs with no API key at all.** Set `LLM_ENABLED=false` and the app uses a
-deterministic embedder and template-based copy — every feature works, nothing is
-mocked out, and it spends nothing. That's the mode the whole test suite runs in.
+deterministic embedder and template copy — every feature works, nothing is mocked out, and
+it spends nothing. That is the mode the whole test suite runs in.
 
 ### See it work
 
-1. Browse a few machine-learning courses, search for something, scroll, sit on a course
-   page for a minute.
-2. Open **`/me`** — the agent reads that behaviour and writes a recommendation.
-   The *"Why these?"* panel lists the only facts it was allowed to cite.
-3. Click **"Not interested"** on a card — it fades immediately and never comes back,
-   including if you refresh into the cold-start path.
-4. Open **`/admin`** — SQL↔vector sync health, LLM calls avoided and why (now including
-   `grade_skipped_heuristic_confident` runs), the compiled agent graph, and every run
-   with its node path, prompt versions, tokens, cost and latency.
-5. Press **"Run digest now"** — the daily email renders to `data/outbox/*.html`.
-6. Open **`/support`** for the FAQ — what's tracked, how recommendations are built, and
-   what the app will never claim.
+1. Open **`/career`**, load the QA → AI Engineer example, and read the first two stages.
+2. Browse a few machine-learning courses, search, sit on a course page for a minute.
+3. Open **`/me`** — the agent reads that behaviour and writes a recommendation. Expand
+   **"Why these?"** for the only facts it was allowed to cite.
+4. Click **"Not interested"** on a card — it never comes back, including via cold start.
+5. Open **`/admin`** — sync health, LLM calls avoided and why, the compiled graph, and
+   every run's node path, tokens, cost and latency.
 
-The catalogue is 66 real courses across AI/ML, data, software, cloud, DevOps, security,
-testing, product, design,
-product and career — from Andrew Ng's specialisations to Karpathy's Zero to Hero to
-OSCP. Deliberately recognisable, so you can judge for yourself whether a recommendation
-makes sense instead of taking it on trust. `uv run python -m app.seed` also generates 24 synthetic
-learners with realistic, clustered enrollment patterns — purely so the collaborative-
-filtering leg has real cross-user signal to work with from a fresh clone, never meant to
-be logged into.
+The catalogue is 66 real courses — Andrew Ng's specialisations, Karpathy's Zero to Hero,
+OSCP — deliberately recognisable, so you can judge a recommendation for yourself. Seeding
+also generates 24 synthetic learners so the collaborative-filtering leg has real
+cross-user signal from a fresh clone.
 
----
-
-## Core capabilities, in depth
-
-### 1. Platform
-
-Email/password auth (bcrypt cost 12, JWT in an `HttpOnly` cookie, CSRF double-submit),
-two roles, and **14 tables** — thirteen related, plus a standalone embedding cache:
+## Architecture
 
 ```
-users ─┬─1:1─ user_profiles
-       ├─1:N─ events ──N:1─ products ─1:N─ vector_outbox
-       ├─1:N─ recommendations ─1:N─ recommendation_items ─N:1─ products
-       ├─1:N─ agent_runs
-       └─1:N─ notifications
-
-embedding_cache          keyed by (embedder, text), joined to nothing on purpose
+┌──────────────── BROWSER ─────────────────────────────────────────────────────┐
+│ Jinja2 pages · tracker.js → throttle → batch(20 | 5s) → sendBeacon ──┐       │
+└──────────────────────────────────────────────────────────────────────┼───────┘
+                                                          202 in ~3ms  │
+┌──────────────────────── FastAPI ─────────────────────────────────────▼───────┐
+│  ┌── INGEST ─────────┐   ┌── TRIGGER POLICY ────┐   ┌── AGENT (LangGraph) ─┐ │
+│  │ bounded queue     │──▶│ enough events?       │──▶│ analyze → plan →     │ │
+│  │ dedupe by idem key│   │ cooldown elapsed?    │   │ retrieve → grade →   │ │
+│  │ chunked bulk write│   │ interests drifted?   │   │  (refine ⟲ ≤2) →     │ │
+│  └────────┬──────────┘   │ budget left?         │   │ generate → verify →  │ │
+│           ▼              │ signature cached? ─skip│  │ finalize             │ │
+│  ┌── PROFILE ────────┐   └──────────────────────┘   └──────┬───────────────┘ │
+│  │ 48h half-life     │      ┌── RETRIEVAL ──────────────┐  │                 │
+│  │ intent weighting  │─────▶│ vector kNN ⊕ BM25 ⊕ CF    │◀─┘                 │
+│  │ interest centroid │      │ → RRF → filter → MMR      │                    │
+│  └───────────────────┘      └───────────────────────────┘                    │
+│  ┌── OUTBOX WORKER ──┐   ┌── APScheduler ────────────────────────────────┐   │
+│  │ drain · backoff   │   │ 16:00 digest · 60s outbox · 1h reconcile      │   │
+│  └────────┬──────────┘   └───────────────────────────────────────────────┘   │
+└───────────┼──────────────────────┬────────────────┬──────────────┬───────────┘
+            ▼                      ▼                ▼              ▼
+     ┌─────────────┐      ┌──────────────┐   ┌────────────┐  ┌───────────┐
+     │ SQLite / PG │      │   Mesh API   │   │  ChromaDB  │  │   SMTP    │
+     │  14 tables  │      │ chat + embed │   │ / Pinecone │  │ / file    │
+     └─────────────┘      └──────────────┘   └────────────┘  └───────────┘
 ```
 
-`embedding_cache` deliberately has no foreign key: vectors are a pure function of the
-model and the text, so a re-seed reuses what was already paid for even when the row that
-first needed them is gone.
+**Every model call leaves through `app/services/mesh.py`.** That single choke point is
+what makes the budget cap, circuit breaker and token accounting real system properties
+rather than per-call discipline someone has to remember.
 
-### 2. Catalogue management with dual-write
-
-Admin CRUD at `/admin/products`. The write is **not** a best-effort double write — it
-is a **transactional outbox**:
-
-1. Saving a course writes the `products` row **and** a `vector_outbox` row in **one
-   commit**. Atomic.
-2. A worker drains the outbox: embed → upsert → stamp `vector_synced_at`.
-3. Failures retry with exponential backoff + jitter, then dead-letter after 5 attempts.
-4. An hourly `reconcile()` diffs SQL against the index **by content hash** and repairs
-   drift in both directions.
-
-A naive `db.commit(); chroma.upsert()` has a window where SQL committed and the vector
-write failed, and **nothing remembers it needs fixing**. Here the *intent to sync* is
-committed with the data, so an outage is a delay rather than permanent divergence.
-
-Three drift classes are tested by injecting each fault — **on both backends, live**:
-
-| Injected | Detected | Repaired |
-|---|---|---|
-| Vector deleted, SQL still has it | `missing` | ✅ |
-| Ghost vector with no SQL row | `orphaned` | ✅ |
-| Vector's `content_hash` tampered | `stale` | ✅ |
-
-**The invariant:** the index contains *exactly* the published courses. Unpublishing
-enqueues a delete rather than setting a flag retrieval must remember to filter on.
-
-### 3. Behavioural event tracking
-
-`tracker.js` — ~290 lines, no dependencies. Captures `page_view`, `product_view`,
-`product_click`, `search`, `search_result_click`, `filter`, `scroll_depth`
-(25/50/75/100), `dwell`, `wishlist`, `enroll`, `rec_impression`, `rec_click`.
-
-**Non-blocking by construction:**
-
-- Batches at **20 events or 5 s**, whichever comes first
-- Scroll throttled to 1/500 ms; search debounced 400 ms and ignored below 3 characters
-- `navigator.sendBeacon` on `pagehide`/`visibilitychange` — the browser completes it
-  after the page is gone, which is exactly when dwell time is finally known
-- `requestIdleCallback(fn, {timeout: 500})` — the timeout is mandatory, a backgrounded
-  tab defers an untimed callback indefinitely
-- `localStorage` spill-over retries a failed batch on the next page load, **including
-  when the server answered 429 or 500** — `fetch` resolves on those, so a `.catch()`-only
-  handler drops exactly the batches worth keeping
-- Flushes are chunked to the server's per-batch cap, so a stash drain after an outage
-  cannot arrive as one oversized 422
-- Every event carries a client-generated idempotency key, so retries are free
-
-**Measured against the running server** (25 requests per row, end to end):
-
-| batch | p50 | p95 | max |
-|---|---|---|---|
-| 1 event | 2.7 ms | 4.1 ms | 6.4 ms |
-| 10 events (one page's worth) | 3.0 ms | 4.4 ms | 21.2 ms |
-| a course page render, for scale | 5.5 ms | 13.6 ms | — |
-
-The beacon costs less than rendering the page it is reporting on. Three identical
-replays → `persisted: 6, duplicates: 2` from a batch of 8.
-
-The server validates **per event**, not per batch — a retired event type from a
-`tracker.js` still in someone's browser cache rejects that one event, not the 99 good
-ones alongside it. The rate limiter charges per event and is sized from that: a
-25-page session at ~10 events a page never trips it, an 800-event burst does.
-
-### 4. The agentic recommendation engine
-
-Nine LangGraph nodes. **Only two spend tokens.**
-
-```
-START → analyze → plan ─┬─▶ coldstart ────────────┐
-                        └─▶ retrieve → grade ─┬───┴─▶ generate → verify ─┬─▶ finalize → END
-                                ▲             │                          │
-                                └── refine ◀──┘ (score < 0.6, max 2)     └─▶ generate (repair ×1)
-```
-
-| Node | Model? | Job |
-|---|---|---|
-| `analyze` | — | profile → search query, metadata filters, citable evidence |
-| `plan` | — | enough signal to retrieve against, or cold start? |
-| `coldstart` | — | no usable behaviour yet: the catalogue's own top-rated, rather than an invented interest |
-| `retrieve` | — | vector ⊕ BM25 → RRF → filter → MMR |
-| `grade` | **fast** | LLM-as-judge on retrieval quality **and** re-rank, in one call |
-| `refine` | — | reword the query, widen filters, retry |
-| `generate` | **main** | persuasive JSON: headline, narrative, per-course reasons |
-| `verify` | — | groundedness + honesty gate |
-| `finalize` | — | fall back to honest copy rather than ship something wrong |
-
-**`analyze` is deliberately deterministic.** Turning a behaviour profile into a search
-query is arithmetic over scores already computed — paying a model to restate its own
-inputs adds latency, cost and a failure mode for no accuracy gain. The nodes that need
-*judgement* get a model.
-
-**`verify` is the anti-hallucination gate.** Two independent failure modes, both tested:
-
-- A recommended `product_id` that was never offered → **dropped**, repair triggered
-- Copy that is grounded but *dishonest* → **caught by guardrails**
-
-Repair is bounded to **one** attempt. An unbounded loop against a model repeating the
-same mistake burns budget without converging.
-
-**Level as a progression signal.** Courses carry `beginner | intermediate | advanced`.
-A learner consistently opening advanced material has outgrown the introductory shelf, so
-retrieval spans their level and the next rung up — which is exactly what someone learning
-wants recommended, and what lets the copy say *"this picks up where that left off"*
-rather than just *"here's something similar"*.
-
-**Is it actually personalised, or a popular list with better prose?** Three learners,
-same catalogue, different histories, run against the live gateway:
-
-| | shared with the popularity baseline | with each other |
-|---|---|---|
-| beginner, browsed AI/ML, searched *"learn machine learning from scratch"* | 1 / 4 | — |
-| advanced, browsed security, searched *"penetration testing certification"* | 1 / 4 | 0 / 4 |
-| career-switcher, browsed data, searched *"sql for analysts"* | 0 / 4 | 0 / 4 |
-
-No two learners were shown the same course, and each got material at **their** level —
-the beginner got Andrew Ng, the advanced learner got OSCP first. The copy tracks the
-behaviour too:
-
-> **You've been exploring data courses, particularly focusing on SQL and analytics. The
-> Google Data Analytics Certificate directly aligns with your goal of building a
-> portfolio for a career change in data.**
-
-The security learner's run exercised the refine loop **twice** —
-`analyze → plan → retrieve → grade → refine → retrieve → grade → refine → retrieve →
-grade → generate → verify → finalize`, $0.000691. The career-switcher was shown **two**
-courses, not four: only two genuinely fit, so the agent stopped.
-
-### 5. Efficiency and production thinking
-
-A recommendation costs a model call only if **every** gate passes:
-
-```
-events_since_last_rec ≥ 5
-  AND now − last_rec ≥ 90s
-  AND ( cosine drift ≥ 0.10  OR  ≥15 new events  OR  expired  OR  user pressed refresh )
-  AND daily budget not exhausted  AND  per-user cap not hit  AND  circuit closed
-  AND behaviour signature not already cached
-```
-
-The **behaviour signature** is the cache key: `sha256` of the *ranked order* of the top
-categories, tags, brands, tier and price band. Ranked order, not raw scores — scores
-move on every single event, so a score-based key would never hit.
-
-Every skip records a reason, and `/admin` shows them:
-
-```
-cache_hit 41 · interests_unchanged 22 · too_few_new_events 18 · cooldown 9 · warming_up 4
-```
-
-Other production concerns: bounded ingest queue that **sheds** rather than growing
-under flood; embedding cache keyed by content hash (re-seeding costs $0); circuit
-breaker; per-model runtime parameter negotiation; structured JSON logs with a request
-id threaded through to the agent; Prometheus `/metrics`; `/healthz` + `/readyz`;
-token-bucket rate limiting; CSP and security headers.
-
----
+Component detail in [`docs/architecture.md`](docs/architecture.md); the schema, dual-write,
+event pipeline and agent nodes in [`docs/capabilities.md`](docs/capabilities.md).
 
 ## Beyond the basics
 
 | Bonus | Status |
 |---|---|
-| ⭐ **Structured agent framework** | LangGraph 1.2, 9 nodes, conditional edges, bounded refine + repair loops. `/admin` renders the graph **read from the compiled object**, so it cannot drift from what runs |
-| ⭐ **Scheduled proactive delivery** | APScheduler: digest at 16:00 UTC (with jitter), outbox drain 60 s, reconcile hourly. Idempotent via a unique `digest:<user>:<date>` key |
-| ⭐ **Observability** | **LangSmith** traces the graph (with the Mesh calls nested inside as real `llm` runs), **Logfire** traces the request around it — HTTP, SQL, tokens — and one run reaches both through LangSmith's OTel bridge. **Both live, not just wired.** Plus a durable `agent_runs` table: node path, grade, refines, tokens, cost, latency, trace URL. [Details ↓](#observability-two-views-one-run) |
-| ⭐ **Retrieval polish** | Hybrid vector+BM25 → RRF → metadata filters → MMR → LLM re-rank. Relevance floor **tuned by sweep, not guessed** |
-| ➕ **Guardrails** | Deterministic rails always on (free, offline); NeMo Guardrails as an opt-in second layer, routed through Mesh |
-| ➕ **Two vector backends** | Chroma locally, Pinecone when deployed, behind one 7-method protocol. **Both verified against live indexes** — identical recall on the same 20 probes, one env var apart |
-| ➕ **Offline eval harness** | 20 paraphrase probes, recall@k + MRR, `uv run python scripts/eval_retrieval.py` |
-| ➕ **Generation-quality evals** | DeepEval RAG metrics + a custom GEval rubric against the real `generate()` output, routed through Mesh, `uv run python scripts/eval_generation.py` |
-| ➕ **Adversarial red-teaming** | Prompt-injection probes against the live `generate → verify` path (`uv run python scripts/red_team.py`, **4/4 blocked**), plus hermetic no-LLM adversarial tests that run in every CI build |
-| ➕ **Prompt versioning** | `AgentRun.prompt_versions` — every run records which prompt version wrote it, visible in `/admin/agent-runs` |
-| ➕ **Input-side PII scrubbing** | Search-query text is redacted before it reaches a prompt (`app/services/pii.py`), not just checked on the way out |
-
----
-
-## Why it's built this way
-
-### Model selection — measured, not assumed
-
-I probed the live gateway before writing a line of agent code:
-
-| Model | Latency | Completion tokens | Valid JSON? |
-|---|---|---|---|
-| `moonshotai/kimi-k3` | 12.7 s | 396 (**220 reasoning**) | ✅ best copy |
-| `openai/gpt-4o-mini` | 1.8 s | 142 (0 reasoning) | ✅ |
-| `google/gemini-2.5-flash` | 5.5 s | 886 (757 reasoning) | ❌ truncated |
-| `anthropic/claude-haiku-4.5` | 3.3 s | 181 | ❌ ```json fenced |
-
-Three behaviours in `mesh.py` exist purely because of that probe:
-
-1. **`EmptyCompletion`** — a reasoning model can return **200 OK with `""`** if the
-   token ceiling is consumed by hidden reasoning. Default ceiling is 4000 with an
-   explicit error instead of a baffling downstream parse failure.
-2. **Runtime parameter negotiation** — `kimi-k3` returns 400 on any `temperature != 1`.
-   A 400 naming a parameter drops it and *remembers* that per model, rather than a
-   hardcoded quirk list that rots.
-3. **Fence-tolerant JSON parsing** — models fence JSON *even in `json_object` mode*.
-
-Default is `gpt-4o-mini`; switch `MESHAPI_MODEL` to `kimi-k3` for a demo recording.
-
-### Retrieval floor — swept, not guessed
-
-A kNN index returns *k* results whether or not any are near. With `k=40` over a
-35-course catalogue that is nearly everything, so those ranks are noise that dilutes rank
-fusion. Sweeping the floor over 20 paraphrase probes (`uv run python scripts/eval_retrieval.py --sweep`):
-
-| ratio | recall@1 | recall@5 | MRR | avg pool |
-|---|---|---|---|---|
-| 0.00 | 0.95 | 1.00 | 0.975 | 32.8 |
-| 0.35 | 0.95 | 1.00 | 0.975 | 26.0 |
-| 0.50 | 0.95 | 1.00 | 0.975 | 13.3 |
-| **0.55** | **0.95** | **1.00** | **0.975** | **10.0** |
-| 0.60 | 0.95 | 1.00 | 0.975 | 7.5 |
-| 0.80 | 0.95 | 1.00 | 0.975 | 1.9 |
-
-Quality is **flat** across the entire range: the fused ranking is already right, so the
-floor is not a quality knob here at all — it decides how much noise MMR has to
-diversify over. `retrieve` asks for 8 candidates, so `0.55` (pool 10) leaves a real
-choice while `0.60` and tighter starves it below what was requested. Tuned on one
-catalogue of 35 items — re-run `uv run python scripts/eval_retrieval.py --sweep` if yours differs.
-
-**The probes needed fixing before the numbers meant anything.** A first draft described
-teaching styles with no subject — *"get something working in week one and explain it
-afterwards"* — and scored recall@1 **0.50**. Vector-only inspection showed the best hit
-at similarity 0.29: a sentence about pedagogy matches every course equally. That was
-measuring the probes, not the retrieval. Rewritten to name the subject while still
-avoiding the course's title words, recall@1 went to **0.95**.
-
-### RRF fuses by rank, never by score
-
-Cosine lives in `[-1,1]`; BM25 is unbounded and corpus-dependent. Normalising them into
-a weighted sum means inventing an exchange rate that shifts with every catalogue edit.
-Tested: a vector hit scoring `999999` and a lexical hit scoring `0.0001` produce
-**identical** fused scores — both are rank 1.
-
-### Guardrails, because the model is being asked to persuade
-
-Invented discounts and manufactured scarcity are not hypothetical failure modes here —
-they are the *most likely* ones, because persuasive training data is full of them. The
-deterministic rails block outcome promises, fabricated urgency, invented discounts,
-**any price not in the catalogue**, unsupported superlatives, and PII. They run always,
-free, offline and in CI.
-
-**Real courses raise a second risk.** A model recognises the Deep Learning
-Specialization and will happily recite a syllabus from training data that may be wrong or
-years stale. The generation prompt therefore states that catalogue facts are the *only*
-facts it may use, and the `spec` field exists so there is always something accurate to
-quote.
-
-**Education invites a specific set of inventions.** The catalogue has a title, provider,
-track, level, price, rating, tags and a syllabus line — no accreditation, no placement
-data, no cohort dates, no completion statistics. So "job guarantee", "93% of graduates
-find work", "accredited", "recognised by employers", "seats are filling", "1-on-1
-mentoring" are unsupported *by construction*, and every one is a phrase a model reaches
-for unprompted, because its training data on course marketing is saturated with them.
-
-The reverse error matters just as much. One syllabus line genuinely says **"lifetime
-access"** — a rail on that phrase would reject the model for quoting the catalogue
-correctly. The rails forbid only what the catalogue cannot support, never what it does,
-and a test pins both directions.
-
-### Evals, prompt versioning and red-teaming — measured, not assumed
-
-Guardrails prove *known* bad patterns are blocked. They don't answer "is this prompt
-actually behaving," which needs a judge, or "does this hold up against someone trying to
-break it," which needs an attacker. Both were added, both run for real, not just wired.
-
-**DeepEval, not DeepEval-and-RAGAs.** `GEval` — DeepEval's implementation of the
-custom-rubric-as-LLM-judge pattern — is also where DeepEval's own RAG metrics
-(`FaithfulnessMetric`, `AnswerRelevancyMetric`) live, so one dependency covers both
-"measure faithfulness the way RAGAs would" and "grade against our own rubric" instead of
-two. Routed through `MeshDeepEvalModel` (`app/services/eval_llm.py`), so an eval run
-still hits the same budget cap and `/metrics` counters a real recommendation would.
-
-The custom rubric's five criteria are copied from `GENERATE_SYSTEM`'s HARD RULES, on
-purpose — when the prompt changes, the rubric is what says whether the change helped.
-One real run, three scenarios, `gpt-4o-mini` on both sides:
-
-```
-ml_progression:    Faithfulness 1.00   AnswerRelevancy 1.00   grounded_persuasion 0.40
-web_fundamentals:  Faithfulness 0.88   AnswerRelevancy 0.78   grounded_persuasion 0.30
-data_engineering:  Faithfulness 1.00   AnswerRelevancy 1.00   grounded_persuasion 0.60
-```
-
-`web_fundamentals` scoring lower is the harness working: the judge's reason named a
-specific unsupported claim in the model's narrative — the same failure class `verify()`
-catches downstream, caught one stage earlier.
-
-**Red-teaming targets the real attack surface, not a hypothetical one.** A search query
-is quoted verbatim into `evidence()`, which is quoted verbatim into the prompt — so a
-search box is a prompt-injection vector. `scripts/red_team.py` runs four probes (injection
-via search query, a fake system-role marker, an injected catalogue description, a
-roleplay jailbreak) through the real `generate → verify → finalize` path with a real
-model. **4/4 blocked** on `gpt-4o-mini` — not because the model always refuses, but
-because `verify()`/`guardrails` catch whatever gets through either way. Hermetic versions
-of the same idea (`tests/test_agent.py::TestAdversarialGeneration`, expanded
-`TestGuardrails` cases) stub the model response and run in every CI build, no key needed.
-
-**PII had an input-side gap.** The output-side check (`guardrails.check_copy`) always
-existed; nothing scrubbed a user's own search text before it reached a prompt. Typing an
-email into search flowed unredacted through `profile.evidence()` into the model's
-context — the output check would only have caught it if the model happened to echo it
-back. `app/services/pii.py` closes that at the point raw text becomes prompt content, not
-at ingestion, so a user's own event history stays intact.
-
-Full writeup: [`docs/evals.md`](docs/evals.md).
-
-### Recommending fewer than four
-
-Retrieval always returns a full slate, so a narrow interest gets padded with whatever
-fused in behind it. An A/B run caught it live on the previous catalogue: a fitness
-shopper's fourth pick was a video doorbell, reasoned as *"in case you're looking for more
-tech at home"*. Honest, grounded, and exactly what makes a recommender feel generic.
-
-The generation prompt now asks for *up to* `REC_TOP_K` and says plainly that three
-courses someone would actually take beats four with a filler. Verified on the current
-catalogue: the career-switching learner was shown **two** courses, because only two
-genuinely fit a beginner moving into data.
-
-### Observability: two views, one run
-
-Two backends, because they answer different questions and neither is complete alone.
-**LangSmith** shows the graph — which node ran, what the model was actually asked, why
-`verify` rejected a draft. **Logfire** shows the request that graph was serving — the
-HTTP span, the SQL underneath it, the Mesh call and its token count, on one timeline.
-
-They are joined rather than duplicated. Setting `LANGSMITH_TRACING_MODE=hybrid` makes
-the LangSmith SDK write each run to LangSmith *and* emit it as an OpenTelemetry span,
-which Logfire receives because Logfire owns the global tracer provider. One run, two
-places — **both verified live against real projects**, with the LangSmith SDK confirmed
-to be writing into `logfire._internal.tracer._ProxyTracer` rather than one of its own.
-The whole graph arrives, refine loops, guardrail repair and all:
-
-```
-smartreco.recommend                                          $0.000601
-  └ LangGraph
-     └ analyze → plan → retrieve → grade → generate → verify → finalize
-                          ChatOpenAI 673 tok ─┘        └─ 1447 tok
-```
-
-Mesh traffic leaves through the raw OpenAI SDK, not a LangChain model, so LangSmith
-would otherwise show chain nodes with nothing underneath them — no prompt, no tokens.
-`wrap_openai` on the Mesh client fixes that: the three calls in the run above appear as
-three `llm` runs totalling 2,747 tokens, which is exactly what `agent_runs` recorded
-independently. Logfire gets the same calls through `instrument_openai`.
-
-Two things here fail *silently*, which is why `app/observability.py` is one module and
-not two, and why they have tests:
-
-**Ordering.** `langsmith.Client` decides once, at construction, where its OTel spans go:
-adopt an existing global provider, or build its own pointed at LangSmith's OTLP endpoint.
-Configure Logfire after that and LangGraph spans never reach it — nothing errors, they
-just go elsewhere. `configure()` runs Logfire first and only then sets hybrid mode; set
-hybrid with no provider installed and every run lands in LangSmith *twice*.
-
-**Sinks.** `LOGFIRE_ENABLED=true` with no token and no console output builds a span per
-request and drops all of them — instrumentation overhead buying nothing. That is refused
-with a warning naming the fix rather than started. And `send_to_logfire` is pinned to
-`"if-token-present"`: the plain `True` makes Logfire open an interactive project setup,
-which in a container is a boot that hangs forever.
-
-The same wiring fixed a bug it exists to catch. `AgentRun.langsmith_url` had always
-stored `""`: it was read next to the other fields, after the graph returned, where
-`get_current_run_tree()` is already `None`. The link is now captured inside the traced
-call, and a regression test models exactly that distinction.
-
-`/readyz` reports which backends are live, so "are traces being recorded" is answerable
-without reading logs — the question you ask once the demo is already running.
-
----
+| ⭐ **Structured agent framework** | LangGraph 1.2, 9 nodes, conditional edges, bounded refine + repair loops. `/admin` renders the graph **read from the compiled object** |
+| ⭐ **Scheduled proactive delivery** | APScheduler: digest at 16:00 UTC, outbox drain 60 s, reconcile hourly. Idempotent per `digest:<user>:<date>` |
+| ⭐ **Observability** | **LangSmith** traces the graph, **Logfire** traces the request around it, joined through an OTel bridge. Both live, not just wired. Plus a durable `agent_runs` table |
+| ⭐ **Retrieval polish** | Hybrid vector+BM25 → RRF → filters → MMR → LLM re-rank. Relevance floor **tuned by sweep, not guessed** |
+| ➕ **Guardrails** | Deterministic rails always on, free and offline; NeMo Guardrails as an opt-in second layer |
+| ➕ **Two vector backends** | Chroma locally, Pinecone deployed, behind one protocol. **Both verified against live indexes** |
+| ➕ **Evals** | Retrieval recall@k + MRR; DeepEval faithfulness/relevancy plus a custom GEval rubric on real `generate()` output |
+| ➕ **Red-teaming** | Prompt-injection probes against the live `generate → verify` path — **4/4 blocked** |
+| ➕ **Prompt versioning** | Every run records which prompt version wrote it, visible in `/admin/agent-runs` |
+| ➕ **Input-side PII scrubbing** | Search text is redacted before it reaches a prompt, not just checked on the way out |
 
 ## Testing
 
 ```bash
-uv run pytest tests/ -q                                              # 437 tests, offline, no API key, spends nothing
-uv run pytest tests/ -q --cov=app --cov-report=term-missing          # coverage report (92%)
-uv run python scripts/eval_retrieval.py                              # retrieval quality against 20 paraphrase probes
-uv run python scripts/eval_generation.py                             # DeepEval RAG metrics + custom rubric on real generate() output (costs tokens)
-uv run python scripts/red_team.py                                    # adversarial prompt-injection probes (costs tokens)
+uv run pytest tests/ -q                       # 437 tests, offline, no API key, spends nothing
+uv run pytest tests/ -q --cov=app             # coverage (92%)
+uv run python scripts/eval_retrieval.py       # recall@k + MRR over 20 paraphrase probes
+uv run python scripts/eval_generation.py      # DeepEval metrics + custom rubric (costs tokens)
+uv run python scripts/red_team.py             # adversarial prompt-injection probes (costs tokens)
 ```
-
-| Module | Covers |
-|---|---|
-| `test_unit.py` | passwords, JWT, CSRF, JSON extraction, guardrails (including prompt-injection-shaped adversarial cases), PII detection/scrubbing, BM25, RRF, MMR |
-| `test_mesh.py` | Mesh gateway against a stub: retries, breaker, budget, parameter negotiation, the empty-completion trap |
-| `test_storage.py` | embedding cache, both vector backends, dual-write, outbox retry + dead-letter, all three drift classes |
-| `test_pipeline.py` | ingest, dedupe, decay, evidence (including PII scrubbing before it reaches a prompt), drift, signature, **all 11 trigger gates** |
-| `test_agent.py` | graph shape, groundedness verifier, repair bounding, adversarial generation (stubbed model hallucinating a pick / injecting hype), end-to-end |
-| `test_digest.py` | audience, rendering, once-only delivery, SMTP send path, scheduler |
-| `test_api.py` | HTTP: auth, CSRF, tracking ingest, admin access control, dual-write over HTTP |
-| `test_observability.py` | sink selection, the OTel bridge, and the two silent failure modes below |
-
-`uv run python scripts/eval_generation.py` and `uv run python scripts/red_team.py` need a real
-`MESHAPI_API_KEY` and are not run in CI — same trade-off `uv run python scripts/eval_retrieval.py`
-(and its `--sweep` mode) already make for retrieval quality, extended to generation quality and
-adversarial robustness. See [`docs/evals.md`](docs/evals.md).
 
 Several tests are explicitly labelled regressions for bugs found during the build — an
 unpublished course staying recommendable, a search-only learner getting no interest
-signal, duplicate texts being embedded twice in one batch, error pages returning 200,
-and the digest's failure counter reporting a clean run while nothing was delivered.
-
----
+signal, error pages returning 200, and a digest reporting clean runs while delivering
+nothing.
 
 ## Configuration
 
@@ -707,15 +213,10 @@ Everything is in `.env` (see `.env.example`). The knobs that matter most:
 | `LLM_DAILY_BUDGET_USD` | `1.00` | Hard spend cap across all callers |
 | `REC_MIN_EVENTS` | `5` | Events before a recommendation is considered |
 | `REC_COOLDOWN_SECONDS` | `90` | Floor between runs for one learner |
-| `REC_DRIFT_THRESHOLD` | `0.10` | Interest change needed to justify a call |
 | `RETRIEVAL_SCORE_RATIO` | `0.55` | Relevance floor, relative to the best hit |
-| `VECTOR_BACKEND` | `chroma` | `chroma` locally, `pinecone` when deployed — `docker compose` sets it |
+| `VECTOR_BACKEND` | `chroma` | `chroma` locally, `pinecone` when deployed |
 | `LANGSMITH_TRACING` | `false` | `true` + an API key traces the graph |
-| `LOGFIRE_ENABLED` | `false` | Needs `LOGFIRE_TOKEN` **or** `LOGFIRE_CONSOLE=true` to do anything |
-| `MAIL_BACKEND` | `auto` | `auto` picks SMTP if configured, else the file sink |
-| `DIGEST_HOUR` | `16` | Daily digest, UTC |
-
----
+| `LOGFIRE_ENABLED` | `false` | Needs `LOGFIRE_TOKEN` **or** `LOGFIRE_CONSOLE=true` |
 
 ## Deployment
 
@@ -725,105 +226,50 @@ docker compose --profile postgres up --build   # Postgres instead
 uv run alembic upgrade head                    # apply database migrations
 ```
 
-Multi-stage image, non-root user, healthcheck, `data/` on a volume. CI runs lint,
-the suite on Python 3.11 and 3.12 with an 80% coverage floor, a from-scratch migration
-check, a seed-and-verify-sync check, and a container build that must report healthy.
+Multi-stage image, non-root user, healthcheck, `data/` on a volume. CI runs lint, the
+suite on Python 3.11 and 3.12 with an 80% coverage floor, a from-scratch migration check,
+a seed-and-verify-sync check, and a container build that must report healthy.
 
-**The vector store follows the same local/remote split as the database.** Chroma is a
-file on disk — no account, no network — which is what lets the test suite, CI and a
-fresh `git clone` work with nothing signed up for. A container's disk does not survive
-a restart or a second replica, so `docker compose` sets `VECTOR_BACKEND=pinecone` and
-expects `PINECONE_API_KEY` in `.env`. Override with `VECTOR_BACKEND=chroma` to run the
-container against the mounted volume instead. Nothing above `vectorstore.py` knows
-which one is live, and the two are never used at once.
-
-Set `MESH_API_KEY` as a GitHub Actions secret if you want live runs in CI — the test
-suite does not need it.
-
----
+A container's disk does not survive a restart, so `docker compose` sets
+`VECTOR_BACKEND=pinecone`. Nothing above `vectorstore.py` knows which backend is live.
 
 ## Honest limitations
 
-**Two integrations have never touched their real service**, because both need a
-third-party account. Each is covered against a stub of the vendor's API — which pins the
-request shape, and proves nothing about whether the vendor accepts it. That distinction
-is the point of this section, and Pinecone below is why it matters.
-
-- **SES.** Needs an AWS account, a verified sender identity, and — in the sandbox — a
-  verified recipient too. `boto3` also sits in the optional `aws` extra, so it is not
-  installed by default; that now raises a message naming the fix rather than a bare
-  `ModuleNotFoundError` inside a 16:00 cron job. Five tests pin the `send_email` request
-  shape, which is what SES rejects.
-- **SMTP.** No credentials, so every run has used the file sink. Eight tests cover the
-  send path against a stubbed `smtplib.SMTP` — connection parameters, the 30s timeout,
-  STARTTLS, login, and the `multipart/alternative` structure with both bodies, which
-  catches the failures that actually happen (missing plain-text part, wrong headers).
-  Unproven: whether a given provider accepts the mail.
-
-**Pinecone used to be on that list.** It was covered by sixteen stub tests and looked
-fine. Running it against a live serverless index found **three bugs in under an hour**,
-and the stubs had agreed with every one of them:
-
-| Bug | Why the stub missed it | Symptom in production |
-|---|---|---|
-| An existing index of the wrong dimension was reused | The stub only ever created a fresh index | Every upsert fails inside the outbox worker, minutes later, dead-lettering the catalogue |
-| `reset()` 404s on a namespace that does not exist yet | The stub's `delete` never raised | `reindex_all()` — the *first* thing a new setup runs — crashes |
-| `all_hashes()` iterated `list()` as if it yielded id strings | The stub returned what the code expected, not what the SDK returns | Returned `{}`, so reconcile saw every course as `missing` and re-upserted hourly forever, while `stale` and `orphaned` could never be detected — a no-op that looked like a repair |
-
-All three are fixed, each with a regression test whose stub now models the *real* shape.
-Verified live afterwards: 35 vectors indexed from the embedding cache for **$0**, the
-20-probe eval identical to Chroma, drift injected and repaired at exactly 1 vector rather
-than 35, and a full agent run at $0.000492.
-
-Chroma remains the local default, so `git clone` plus `uv run python -m app.seed` and
-`uv run uvicorn app.main:app --reload --port 8000` still needs no
-signup, and it is what the suite and CI run against — but deployments go to Pinecone, and
-that path is now one someone has actually walked.
-- **APScheduler assumes one process.** The jobs are individually safe to run
-  concurrently (the outbox coalesces, reconcile is a diff, the digest has a unique
-  key), so scaling out means changing the scheduler, not the jobs.
-- **Skip counters are in-process** and reset on restart. The dashboard labels them
-  "since this process started" and shows durable database totals separately, rather
-  than mixing the two into one authoritative-looking wrong number.
-- **The budget gate is checked before a call**, so a single call can overshoot the cap;
-  cost is only knowable afterwards. The guarantee is that spending *stops* once the
-  limit is crossed, not that it never crosses it.
-- **Retrieval is tuned on 20 probes against the catalogue.** recall@1 0.95, recall@5 1.00,
-  MRR 0.975 — but a 35-item catalogue is small enough that these numbers would need
-  re-establishing at real scale, where several near-identical deep-learning courses
-  would be competing rather than one.
+- **SES and SMTP have never touched their real service.** Both need a third-party account.
+  Each is covered against a stub of the vendor's API — which pins the request shape and
+  proves nothing about whether the vendor accepts it. Pinecone used to be on this list;
+  running it live found **three bugs in under an hour** that sixteen stub tests had all
+  agreed with. That story is in [`docs/design-decisions.md`](docs/design-decisions.md), and
+  it is why this section exists.
+- **APScheduler assumes one process.** The jobs are individually safe to run concurrently,
+  so scaling out means changing the scheduler, not the jobs.
+- **Skip counters are in-process** and reset on restart. The dashboard labels them "since
+  this process started" and shows durable database totals separately.
+- **The budget gate is checked before a call**, so one call can overshoot the cap. The
+  guarantee is that spending *stops* once the limit is crossed, not that it never crosses.
+- **Retrieval is tuned on 20 probes.** Those numbers would need re-establishing at real
+  scale, where several near-identical deep-learning courses would compete rather than one.
 - **Course names, providers and syllabus lines are real; prices and ratings are
-  illustrative.** This is a demo platform, not a live marketplace, and no course listed
-  here is affiliated with it.
-- **Course artwork is generated, not licensed.** Real course thumbnails belong to their
-  providers, so each card renders a track glyph on a hue derived from the slug —
-  deterministic, zero third-party requests, and compatible with the strict CSP. It reads
-  as a design choice rather than a missing asset.
-
----
+  illustrative.** This is a demo platform, and no course listed here is affiliated with it.
+- **Course artwork is generated, not licensed** — a track glyph on a hue derived from the
+  slug: deterministic, zero third-party requests, CSP-safe.
 
 ## Documentation
 
-This README covers the what-and-why with evidence inline. Six docs go one level
-deeper, written to stay in sync with it rather than duplicate it — they link back here
-for exact counts instead of restating them:
-
 | Doc | Covers |
 |---|---|
-| [`docs/architecture.md`](docs/architecture.md) | System components, the two recommendation engines and why they differ, the request path, and short-term (`AgentState`) vs. long-term (`UserProfile`) context management |
-| [`docs/low-level-design.md`](docs/low-level-design.md) | Module-by-module internals: the accumulator-reducer mechanic, the graph's branch conditions, the decay math, the trigger cascade, Mesh's state machines, the skill vocabulary and the career skill-gap engine |
-| [`docs/features.md`](docs/features.md) | One canonical feature inventory — career layer, learner-facing, admin-facing, responsible-AI, platform |
-| [`docs/evals.md`](docs/evals.md) | DeepEval integration, the custom GEval rubric, prompt versioning, PII scrubbing, red-teaming — full detail behind the "Evals, prompt versioning and red-teaming" section above |
-| [`docs/demo-script.md`](docs/demo-script.md) | A shot-by-shot script for recording a walkthrough video against the real running app |
-| [`docs/video-script-3min.md`](docs/video-script-3min.md) | A 3-minute product video: the story spine, per-scene narration and word budgets, and the pre-flight state the app must be in before recording |
+| [`docs/architecture.md`](docs/architecture.md) | System components, why the two engines differ, the request path, short-term vs. long-term context |
+| [`docs/capabilities.md`](docs/capabilities.md) | The schema, dual-write outbox, event pipeline, the agent's nine nodes, efficiency gates |
+| [`docs/design-decisions.md`](docs/design-decisions.md) | Why it is built this way — model selection probe, retrieval floor sweep, RRF, guardrail reasoning, observability ordering |
+| [`docs/low-level-design.md`](docs/low-level-design.md) | Module-by-module internals: reducers, branch conditions, decay math, Mesh's state machines, the skill-gap engine |
+| [`docs/features.md`](docs/features.md) | One canonical feature inventory by audience |
+| [`docs/evals.md`](docs/evals.md) | DeepEval, the GEval rubric, prompt versioning, PII scrubbing, red-teaming |
+| [`docs/demo-script.md`](docs/demo-script.md) · [`docs/video-script-3min.md`](docs/video-script-3min.md) | Recording scripts for a walkthrough and a 3-minute product video |
 
-Two presentation assets sit alongside them, both derived from this README rather than
-maintained separately — regenerate them when the numbers above change:
-[`docs/smartreco-overview.svg`](docs/smartreco-overview.svg) (the one-page diagram) and
-[`docs/smartreco-onepager.pptx`](docs/smartreco-onepager.pptx) (the same summary as a
-single slide).
-
----
+Two presentation assets are derived from this README rather than maintained separately —
+regenerate them when the numbers above change:
+[`docs/smartreco-overview.svg`](docs/smartreco-overview.svg) and
+[`docs/smartreco-onepager.pptx`](docs/smartreco-onepager.pptx).
 
 ## Stack
 
